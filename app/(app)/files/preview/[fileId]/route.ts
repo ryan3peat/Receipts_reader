@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth"
-import { fileExists, fullPathForFile } from "@/lib/files"
+import { materializeFile } from "@/lib/file-bytes"
 import { resolvePreviewFormat } from "@/lib/previews/format"
 import { generateFilePreviews } from "@/lib/previews/generate"
 import { getFileById } from "@/models/files"
@@ -28,11 +28,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ file
       return new NextResponse("File not found or does not belong to the user", { status: 404 })
     }
 
-    // Check if file exists on disk
-    const fullFilePath = fullPathForFile(user, file)
-    const isFileExists = await fileExists(fullFilePath)
-    if (!isFileExists) {
-      return new NextResponse(`File not found on disk: ${file.path}`, { status: 404 })
+    const fullFilePath = await materializeFile(user, file)
+    if (!fullFilePath) {
+      return new NextResponse("File not found", { status: 404 })
     }
 
     // Generate previews

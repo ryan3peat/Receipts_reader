@@ -42,11 +42,12 @@ describe("ingestUnsortedFile", () => {
 
     expect(file.filename).toBe("invoice.pdf")
     expect(file.mimetype).toBe("application/pdf")
-    expect(file.path).toMatch(/^unsorted\/.+\.pdf$/)
+    expect(file.path.replaceAll("\\", "/")).toMatch(/^unsorted\/.+\.pdf$/)
     expect((file.metadata as Record<string, unknown>).source).toBe("email")
 
     const onDisk = await readFile(path.join(tmpRoot, user.email, file.path))
     expect(onDisk.equals(buffer)).toBe(true)
     expect(created).toHaveLength(1)
+    expect(Buffer.isBuffer(created[0].content) && (created[0].content as Buffer).equals(buffer)).toBe(true)
   })
 })

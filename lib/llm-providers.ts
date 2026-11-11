@@ -20,7 +20,7 @@ export const PROVIDERS: ProviderMeta[] = [
     label: "OpenAI",
     apiKeyName: "openai_api_key",
     modelName: "openai_model_name",
-    defaultModelName: "gpt-4o-mini",
+    defaultModelName: "gpt-6.1-sol",
     maxConcurrencyName: "openai_max_concurrency",
     apiDoc: "https://platform.openai.com/settings/organization/api-keys",
     apiDocLabel: "OpenAI Platform Console",

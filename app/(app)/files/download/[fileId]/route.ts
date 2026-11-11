@@ -1,8 +1,7 @@
 import { getCurrentUser } from "@/lib/auth"
-import { fileExists, fullPathForFile } from "@/lib/files"
+import { readStoredFile } from "@/lib/file-bytes"
 import { encodeFilename } from "@/lib/utils"
 import { getFileById } from "@/models/files"
-import fs from "fs/promises"
 import { NextResponse } from "next/server"
 
 export async function GET(request: Request, { params }: { params: Promise<{ fileId: string }> }) {
@@ -21,15 +20,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ file
       return new NextResponse("File not found or does not belong to the user", { status: 404 })
     }
 
-    // Check if file exists
-    const fullFilePath = fullPathForFile(user, file)
-    const isFileExists = await fileExists(fullFilePath)
-    if (!isFileExists) {
-      return new NextResponse(`File not found on disk: ${file.path}`, { status: 404 })
+    const fileBuffer = await readStoredFile(user, file)
+    if (!fileBuffer) {
+      return new NextResponse("File not found", { status: 404 })
     }
-
-    // Read file
-    const fileBuffer = await fs.readFile(fullFilePath)
 
     // Return file with proper content type and encoded filename
     return new NextResponse(fileBuffer, {

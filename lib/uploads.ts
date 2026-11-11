@@ -1,11 +1,18 @@
 import { File as PrismaFile, User } from "@/prisma/client"
 import { createFile } from "@/models/files"
 import { randomUUID } from "crypto"
-import { mkdir, writeFile } from "fs/promises"
+import { mkdir } from "fs/promises"
 import path from "path"
 import sharp from "sharp"
 import config from "./config"
-import { getStaticDirectory, getUserUploadsDirectory, isEnoughStorageToUploadFile, safePathJoin, unsortedFilePath } from "./files"
+import {
+  getStaticDirectory,
+  getUserUploadsDirectory,
+  isEnoughStorageToUploadFile,
+  safePathJoin,
+  unsortedFilePath,
+  writeBytesIfPossible,
+} from "./files"
 
 export async function uploadStaticImage(
   user: User,
@@ -73,8 +80,7 @@ export async function ingestUnsortedFile(
   const relativeFilePath = unsortedFilePath(fileUuid, input.filename)
   const fullFilePath = safePathJoin(getUserUploadsDirectory(user), relativeFilePath)
 
-  await mkdir(path.dirname(fullFilePath), { recursive: true })
-  await writeFile(fullFilePath, input.buffer)
+  await writeBytesIfPossible(fullFilePath, input.buffer)
 
   return await createFile(user.id, {
     id: fileUuid,
@@ -82,5 +88,6 @@ export async function ingestUnsortedFile(
     path: relativeFilePath,
     mimetype: input.mimetype,
     metadata: { size: input.buffer.length, ...input.metadata },
+    content: input.buffer,
   })
 }

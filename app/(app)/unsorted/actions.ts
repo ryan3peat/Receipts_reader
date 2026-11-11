@@ -9,8 +9,9 @@ import {
   getUserUploadsDirectory,
   safePathJoin,
   unsortedFilePath,
+  writeBytesIfPossible,
 } from "@/lib/files"
-import { createFile, deleteFile, getFileById, updateFile } from "@/models/files"
+import { createFile, deleteFile, getFileById, readFileBytes, updateFile } from "@/models/files"
 import {
   createTransaction,
   TransactionData,
@@ -20,7 +21,7 @@ import {
 import { updateUser } from "@/models/users"
 import { Transaction } from "@/prisma/client"
 import { randomUUID } from "crypto"
-import { mkdir, readFile, rename, writeFile } from "fs/promises"
+import { mkdir, readFile, rename } from "fs/promises"
 import { revalidatePath } from "next/cache"
 import path from "path"
 
@@ -71,8 +72,13 @@ export async function saveFileAsTransactionAction(
     // Move file to new location and name
     const oldFullFilePath = safePathJoin(userUploadsDirectory, file.path)
     const newFullFilePath = safePathJoin(userUploadsDirectory, newRelativeFilePath)
-    await mkdir(path.dirname(newFullFilePath), { recursive: true })
-    await rename(path.resolve(oldFullFilePath), path.resolve(newFullFilePath))
+    try {
+      await mkdir(path.dirname(newFullFilePath), { recursive: true })
+      await rename(path.resolve(oldFullFilePath), path.resolve(newFullFilePath))
+    } catch (error) {
+      const stored = await readFileBytes(file.id)
+      if (!stored) throw error
+    }
 
     // Update file record
     await updateFile(file.id, user.id, {
@@ -129,7 +135,8 @@ export async function splitFileIntoItemsAction(
     // Get the original file's content
     const userUploadsDirectory = getUserUploadsDirectory(user)
     const originalFilePath = safePathJoin(userUploadsDirectory, originalFile.path)
-    const fileContent = await readFile(originalFilePath)
+    const stored = await readFileBytes(originalFile.id)
+    const fileContent = stored ?? (await readFile(originalFilePath))
 
     // Create a new file for each item
     for (const item of items) {
@@ -139,10 +146,7 @@ export async function splitFileIntoItemsAction(
       const fullFilePath = safePathJoin(userUploadsDirectory, relativeFilePath)
 
       // Create directory if it doesn't exist
-      await mkdir(path.dirname(fullFilePath), { recursive: true })
-
-      // Copy the original file content
-      await writeFile(fullFilePath, fileContent)
+      await writeBytesIfPossible(fullFilePath, fileContent)
 
       // Create file record in database with the item data cached
       await createFile(user.id, {
@@ -151,6 +155,7 @@ export async function splitFileIntoItemsAction(
         path: relativeFilePath,
         mimetype: originalFile.mimetype,
         metadata: originalFile.metadata,
+        content: fileContent,
         isSplitted: true,
         cachedParseResult: {
           name: item.name,

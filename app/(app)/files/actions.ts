@@ -40,7 +40,12 @@ export async function uploadFilesAction(formData: FormData): Promise<ActionState
     })
   )
 
-  const storageUsed = await getDirectorySize(getUserUploadsDirectory(user))
+  let storageUsed = (user.storageUsed || 0) + totalFileSize
+  try {
+    storageUsed = await getDirectorySize(getUserUploadsDirectory(user))
+  } catch {
+    // Hosted uploads have no disk folder. The bytes are stored on the file row.
+  }
   await updateUser(user.id, { storageUsed })
 
   revalidatePath("/unsorted")

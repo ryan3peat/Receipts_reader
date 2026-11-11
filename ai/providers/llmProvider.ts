@@ -35,6 +35,16 @@ type LLMModel = ChatOpenAI | ChatGoogleGenerativeAI | ChatMistralAI
 
 type MessageContent = Array<{ type: string; text?: string; image_url?: { url: string } }>
 
+function openAIChat(config: LLMConfig, compatible = false) {
+  const reasoningModel = /^(gpt-[5-9]|o\d)/.test(config.model)
+  return new ChatOpenAI({
+    apiKey: config.apiKey || (compatible ? "not-needed" : ""),
+    model: config.model,
+    ...(reasoningModel ? {} : { temperature: 0 }),
+    ...(compatible ? { configuration: { baseURL: config.baseUrl?.trim() } } : {}),
+  })
+}
+
 function extractErrorInfo(error: unknown): {
   message: string | undefined
   cause: unknown
@@ -56,11 +66,7 @@ async function requestLLMUnified(config: LLMConfig, req: LLMRequest): Promise<LL
     const temperature = 0
     let model: LLMModel
     if (config.provider === "openai") {
-      model = new ChatOpenAI({
-        apiKey: config.apiKey,
-        model: config.model,
-        temperature: temperature,
-      })
+      model = openAIChat(config)
     } else if (config.provider === "google") {
       model = new ChatGoogleGenerativeAI({
         apiKey: config.apiKey,
@@ -74,14 +80,7 @@ async function requestLLMUnified(config: LLMConfig, req: LLMRequest): Promise<LL
         temperature: temperature,
       })
     } else if (config.provider === "openai_compatible") {
-      model = new ChatOpenAI({
-        apiKey: config.apiKey || "not-needed",
-        model: config.model,
-        temperature: temperature,
-        configuration: {
-          baseURL: config.baseUrl?.trim(),
-        },
-      })
+      model = openAIChat(config, true)
     } else {
       return {
         output: {},
@@ -177,18 +176,13 @@ export async function testLLMProvider(config: LLMConfig): Promise<LLMTestResult>
     const temperature = 0
     let model: LLMModel
     if (config.provider === "openai") {
-      model = new ChatOpenAI({ apiKey: config.apiKey, model: config.model, temperature })
+      model = openAIChat(config)
     } else if (config.provider === "google") {
       model = new ChatGoogleGenerativeAI({ apiKey: config.apiKey, model: config.model, temperature })
     } else if (config.provider === "mistral") {
       model = new ChatMistralAI({ apiKey: config.apiKey, model: config.model, temperature })
     } else if (config.provider === "openai_compatible") {
-      model = new ChatOpenAI({
-        apiKey: config.apiKey || "not-needed",
-        model: config.model,
-        temperature,
-        configuration: { baseURL: config.baseUrl?.trim() },
-      })
+      model = openAIChat(config, true)
     } else {
       return { success: false, supportsVision: false, message: `Unknown provider: ${config.provider}` }
     }

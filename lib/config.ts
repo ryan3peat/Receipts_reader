@@ -6,7 +6,7 @@ const envSchema = z.object({
   PORT: z.string().default("7331"),
   SELF_HOSTED_MODE: z.enum(["true", "false"]).default("true"),
   OPENAI_API_KEY: z.string().optional(),
-  OPENAI_MODEL_NAME: z.string().default("gpt-4o-mini"),
+  OPENAI_MODEL_NAME: z.string().default("gpt-6.1-sol"),
   GOOGLE_API_KEY: z.string().optional(),
   GOOGLE_MODEL_NAME: z.string().default("gemini-2.5-flash"),
   MISTRAL_API_KEY: z.string().optional(),

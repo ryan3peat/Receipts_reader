@@ -1,8 +1,7 @@
 "use server"
 
-import { fileExists, getUserPreviewsDirectory, safePathJoin } from "@/lib/files"
+import { ensureWritableDir, fileExists, getUserPreviewsDirectory, safePathJoin } from "@/lib/files"
 import { User } from "@/prisma/client"
-import fs from "fs/promises"
 import path from "path"
 import { fromPath } from "pdf2pic"
 import config from "../config"
@@ -13,8 +12,7 @@ export async function pdfToImages(
   origFilePath: string,
   format: PreviewFormat = DEFAULT_PREVIEW_FORMAT
 ): Promise<{ contentType: string; pages: string[] }> {
-  const userPreviewsDirectory = getUserPreviewsDirectory(user)
-  await fs.mkdir(userPreviewsDirectory, { recursive: true })
+  const userPreviewsDirectory = await ensureWritableDir(getUserPreviewsDirectory(user))
 
   const basename = path.basename(origFilePath, path.extname(origFilePath))
   const extension = previewExtension(format)

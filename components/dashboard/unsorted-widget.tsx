@@ -7,7 +7,7 @@ import Link from "next/link"
 
 export default function DashboardUnsortedWidget({ files }: { files: File[] }) {
   return (
-    <Card className="w-full h-full sm:max-w-xs bg-accent">
+    <Card className="w-full bg-accent">
       <CardHeader>
         <CardTitle>
           <Link href="/unsorted">

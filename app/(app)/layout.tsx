@@ -1,6 +1,7 @@
 import { SubscriptionExpired } from "@/components/auth/subscription-expired"
 import ScreenDropArea from "@/components/files/screen-drop-area"
 import MobileMenu from "@/components/sidebar/mobile-menu"
+import { MobileShortcuts } from "@/components/sidebar/mobile-shortcuts"
 import { AppSidebar } from "@/components/sidebar/sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
@@ -19,12 +20,6 @@ export const metadata: Metadata = {
     default: config.app.title,
   },
   description: config.app.description,
-  icons: {
-    icon: [{ url: "/icon.png", type: "image/png", sizes: "64x64" }],
-    shortcut: "/icon.png",
-    apple: "/apple-touch-icon.png",
-  },
-  manifest: "/site.webmanifest",
 }
 
 export const viewport: Viewport = {
@@ -66,7 +61,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               icon: app.manifest.icon,
             }))}
           />
-          <SidebarInset className="w-full h-full mt-[60px] md:mt-0 overflow-auto">
+          <SidebarInset className="w-full h-full mt-[60px] md:mt-0 overflow-auto pb-20 md:pb-0">
             {actor.userView && (
               <div className="border-b bg-amber-50 px-4 py-2 text-sm text-amber-950">
                 User View is on. You are seeing the sales experience. Turn it off in the sidebar to return to accounts.
@@ -75,6 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {isSubscriptionExpired(user) && <SubscriptionExpired />}
             {children}
           </SidebarInset>
+          <MobileShortcuts />
         </SidebarProvider>
         <Toaster />
       </ScreenDropArea>

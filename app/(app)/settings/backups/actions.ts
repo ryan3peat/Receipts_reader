@@ -115,6 +115,11 @@ export async function restoreBackupAction(
         }
 
         const fileContents = await zipFile.async("nodebuffer")
+        await prisma.fileBlob.upsert({
+          where: { fileId: file.id },
+          create: { fileId: file.id, content: fileContents },
+          update: { content: fileContents },
+        })
         const fullFilePath = safePathJoin(userUploadsDirectory, filePathWithoutPrefix)
         if (!fullFilePath.startsWith(path.normalize(userUploadsDirectory))) {
           console.error(`Attempted path traversal detected for file ${file.path}`)

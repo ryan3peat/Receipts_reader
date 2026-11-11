@@ -1,8 +1,7 @@
 "use server"
 
-import { fileExists, getUserPreviewsDirectory, safePathJoin } from "@/lib/files"
+import { ensureWritableDir, fileExists, getUserPreviewsDirectory, safePathJoin } from "@/lib/files"
 import { User } from "@/prisma/client"
-import fs from "fs/promises"
 import path from "path"
 import sharp from "sharp"
 import config from "../config"
@@ -17,8 +16,7 @@ export async function resizeImage(
   format: PreviewFormat = DEFAULT_PREVIEW_FORMAT
 ): Promise<{ contentType: string; resizedPath: string }> {
   try {
-    const userPreviewsDirectory = getUserPreviewsDirectory(user)
-    await fs.mkdir(userPreviewsDirectory, { recursive: true })
+    const userPreviewsDirectory = await ensureWritableDir(getUserPreviewsDirectory(user))
 
     const basename = path.basename(origFilePath, path.extname(origFilePath))
     const extension = previewExtension(format)

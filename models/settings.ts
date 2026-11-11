@@ -50,8 +50,8 @@ export function getLLMSettings(settings: SettingsMap) {
         if (provider === "openai") {
           return {
             provider: provider as LLMProvider,
-            apiKey: settings.openai_api_key || "",
-            model: settings.openai_model_name || PROVIDERS[0].defaultModelName,
+            apiKey: config.ai.openaiApiKey || settings.openai_api_key || "",
+            model: config.ai.openaiModelName || settings.openai_model_name || PROVIDERS[0].defaultModelName,
             maxConcurrency: parseConcurrency(settings.openai_max_concurrency),
           }
         }

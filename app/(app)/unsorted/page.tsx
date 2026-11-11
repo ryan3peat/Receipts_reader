@@ -13,7 +13,7 @@ import { getCurrencies } from "@/models/currencies"
 import { getFields } from "@/models/fields"
 import { getUnsortedFiles } from "@/models/files"
 import { getProjects } from "@/models/projects"
-import { getAnalyzeConcurrency, getSettings } from "@/models/settings"
+import { getAnalyzeConcurrency, getLLMSettings, getSettings } from "@/models/settings"
 import { FileText, PartyPopper, Settings, Upload } from "lucide-react"
 import { Metadata } from "next"
 import Link from "next/link"
@@ -44,10 +44,9 @@ export default async function UnsortedPage() {
       </header>
 
       {config.selfHosted.isEnabled &&
-        !settings.openai_api_key &&
-        !settings.google_api_key &&
-        !settings.mistral_api_key &&
-        !settings.openai_compatible_base_url && (
+        !getLLMSettings(settings).providers.some((provider) =>
+          provider.provider === "openai_compatible" ? Boolean(provider.baseUrl) : Boolean(provider.apiKey)
+        ) && (
           <Alert>
             <Settings className="h-4 w-4 mt-2" />
             <div className="flex flex-row justify-between pt-2">

@@ -1,19 +1,17 @@
 import { listMembers, requireAccounts } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import {
-  fileExists,
-  fullPathForFile,
   getTransactionExportFileName,
   getTransactionExportFilePath,
   getTransactionExportRelativeFolder,
 } from "@/lib/files"
 import { EXPORT_AND_IMPORT_FIELD_MAP, ExportFields, ExportFilters } from "@/models/export_and_import"
 import { getFields } from "@/models/fields"
+import { readStoredFile } from "@/lib/file-bytes"
 import { getFilesByTransactionId } from "@/models/files"
 import { updateProgress } from "@/models/progress"
 import { getTransactions } from "@/models/transactions"
 import { format } from "@fast-csv/format"
-import fs from "fs/promises"
 import JSZip from "jszip"
 import { NextResponse } from "next/server"
 import { Readable } from "stream"
@@ -67,8 +65,8 @@ export async function GET(request: Request) {
             if (includeFilePaths) {
               const paths: string[] = []
               for (const file of transactionFiles) {
-                const fullFilePath = fullPathForFile(user, file)
-                if (await fileExists(fullFilePath)) {
+                const stored = await readStoredFile(user, file)
+                if (stored) {
                   paths.push(getTransactionExportFilePath(transaction, file, transactionFiles.length))
                 }
               }
@@ -159,12 +157,11 @@ export async function GET(request: Request) {
         if (!transactionFolder) continue
 
         for (const file of transactionFiles) {
-          const fullFilePath = fullPathForFile(user, file)
-          if (await fileExists(fullFilePath)) {
+          const fileData = await readStoredFile(user, file)
+          if (fileData) {
             console.log(
               `Processing file ${++totalFilesProcessed}/${totalFilesToProcess}: ${file.filename} for transaction ${transaction.id}`
             )
-            const fileData = await fs.readFile(fullFilePath)
             transactionFolder.file(getTransactionExportFileName(transaction, file), fileData)
 
             // Update progress every PROGRESS_UPDATE_INTERVAL_MS milliseconds

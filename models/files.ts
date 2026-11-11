@@ -52,13 +52,27 @@ export const getFilesByTransactionId = cache(async (id: string, userId: string) 
 export const createFile = async (userId: string, data: any) => {
   const { getActor } = await import("@/lib/access")
   const actor = await getActor()
-  return await prisma.file.create({
+  const { content, ...fields } = data ?? {}
+  const file = await prisma.file.create({
     data: {
-      ...data,
+      ...fields,
       userId,
       submittedById: actor.user.id,
     },
   })
+  if (content) {
+    const bytes = Buffer.isBuffer(content) ? content : Buffer.from(content)
+    await prisma.fileBlob.create({
+      data: { fileId: file.id, content: bytes },
+    })
+  }
+  return file
+}
+
+export const readFileBytes = async (fileId: string): Promise<Buffer | null> => {
+  const blob = await prisma.fileBlob.findUnique({ where: { fileId } })
+  if (!blob?.content) return null
+  return Buffer.from(blob.content)
 }
 
 export const updateFile = async (id: string, userId: string, data: any) => {
@@ -96,7 +110,9 @@ export const deleteFile = async (id: string, userId: string) => {
     const fullPath = safePathJoin(userUploadsDir, file.path)
     await unlink(fullPath)
   } catch (error) {
-    console.error("Error deleting file:", error)
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.error("Error deleting file:", error)
+    }
   }
 
   return await prisma.file.delete({

@@ -167,9 +167,18 @@ model File {
   isSplitted        Boolean  @default(false) @map("is_splitted")
   cachedParseResult Json?    @map("cached_parse_result")
   createdAt         DateTime @default(now()) @map("created_at")
+  blob              FileBlob?
 
   @@index([submittedById])
   @@map("files")
+}
+
+model FileBlob {
+  fileId  String @id @map("file_id") @db.Uuid
+  file    File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  content Bytes
+
+  @@map("file_blobs")
 }
 
 model Transaction {

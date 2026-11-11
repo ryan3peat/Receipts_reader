@@ -1,4 +1,4 @@
-import { fileExists, fullPathForFile } from "@/lib/files"
+import { materializeFile } from "@/lib/file-bytes"
 import { resolvePreviewFormat } from "@/lib/previews/format"
 import { generateFilePreviews } from "@/lib/previews/generate"
 import { getSettings } from "@/models/settings"
@@ -14,10 +14,9 @@ export type AnalyzeAttachment = {
 }
 
 export const loadAttachmentsForAI = async (user: User, file: File): Promise<AnalyzeAttachment[]> => {
-  const fullFilePath = fullPathForFile(user, file)
-  const isFileExists = await fileExists(fullFilePath)
-  if (!isFileExists) {
-    throw new Error("File not found on disk")
+  const fullFilePath = await materializeFile(user, file)
+  if (!fullFilePath) {
+    throw new Error("File not found")
   }
 
   const settings = await getSettings(user.id)

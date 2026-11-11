@@ -9,6 +9,7 @@ import {
   getUserUploadsDirectory,
   isEnoughStorageToUploadFile,
   safePathJoin,
+  writeBytesIfPossible,
 } from "@/lib/files"
 import { updateField } from "@/models/fields"
 import { createFile, deleteFile } from "@/models/files"
@@ -24,9 +25,7 @@ import {
 import { updateUser } from "@/models/users"
 import { Transaction } from "@/prisma/client"
 import { randomUUID } from "crypto"
-import { mkdir, writeFile } from "fs/promises"
 import { revalidatePath } from "next/cache"
-import path from "path"
 
 export async function createTransactionAction(
   _prevState: ActionState<Transaction> | null,
@@ -181,11 +180,9 @@ export async function uploadTransactionFilesAction(formData: FormData): Promise<
         const buffer = Buffer.from(arrayBuffer)
 
         const fullFilePath = safePathJoin(userUploadsDirectory, relativeFilePath)
-        await mkdir(path.dirname(fullFilePath), { recursive: true })
+        await writeBytesIfPossible(fullFilePath, buffer)
 
-        await writeFile(fullFilePath, buffer)
-
-        // Create file record in database
+        // Create file record in database, with the photo bytes kept for the audit trail
         const fileRecord = await createFile(user.id, {
           id: fileUuid,
           filename: file.name,
@@ -196,6 +193,7 @@ export async function uploadTransactionFilesAction(formData: FormData): Promise<
             size: file.size,
             lastModified: file.lastModified,
           },
+          content: buffer,
         })
 
         return fileRecord
@@ -212,7 +210,12 @@ export async function uploadTransactionFilesAction(formData: FormData): Promise<
     )
 
     // Update user storage used
-    const storageUsed = await getDirectorySize(getUserUploadsDirectory(user))
+    let storageUsed = (user.storageUsed || 0) + totalFileSize
+    try {
+      storageUsed = await getDirectorySize(getUserUploadsDirectory(user))
+    } catch {
+      // Hosted uploads have no disk folder. The bytes are stored on the file row.
+    }
     await updateUser(user.id, { storageUsed })
 
     revalidatePath(`/transactions/${transactionId}`)

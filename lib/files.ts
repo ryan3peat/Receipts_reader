@@ -1,6 +1,7 @@
 import { File, Transaction, User } from "@/prisma/client"
 import { formatDate } from "date-fns"
-import { access, constants, readdir, stat } from "fs/promises"
+import { access, constants, mkdir, readdir, stat, writeFile } from "fs/promises"
+import os from "os"
 import path from "path"
 import config from "./config"
 
@@ -87,6 +88,33 @@ export async function fileExists(filePath: string) {
     return true
   } catch {
     return false
+  }
+}
+
+function isReadOnlyFs(error: unknown) {
+  const code = (error as NodeJS.ErrnoException).code
+  return code === "ENOENT" || code === "EACCES" || code === "EPERM" || code === "EROFS"
+}
+
+export async function writeBytesIfPossible(fullPath: string, buffer: Buffer) {
+  try {
+    await mkdir(path.dirname(fullPath), { recursive: true })
+    await writeFile(fullPath, buffer)
+  } catch (error) {
+    if (isReadOnlyFs(error)) return
+    throw error
+  }
+}
+
+export async function ensureWritableDir(preferred: string) {
+  try {
+    await mkdir(preferred, { recursive: true })
+    return preferred
+  } catch (error) {
+    if (!isReadOnlyFs(error)) throw error
+    const fallback = path.join(os.tmpdir(), "ef-previews")
+    await mkdir(fallback, { recursive: true })
+    return fallback
   }
 }
 

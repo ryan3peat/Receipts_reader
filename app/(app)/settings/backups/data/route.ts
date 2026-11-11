@@ -1,5 +1,6 @@
 import { requireAccounts } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
+import { prisma } from "@/lib/db"
 import { fileExists, getUserUploadsDirectory } from "@/lib/files"
 import { MODEL_BACKUP, modelToJSON } from "@/models/backups"
 import { updateProgress } from "@/models/progress"
@@ -95,6 +96,16 @@ export async function GET(request: Request) {
       } catch (error) {
         console.error(`Error reading file ${file}:`, error)
       }
+    }
+
+    const storedFiles = await prisma.file.findMany({
+      where: { userId: user.id },
+      select: { id: true, path: true },
+    })
+    for (const record of storedFiles) {
+      const blob = await prisma.fileBlob.findUnique({ where: { fileId: record.id } })
+      if (!blob || uploadsFolder.file(record.path)) continue
+      uploadsFolder.file(record.path, Buffer.from(blob.content))
     }
 
     // Final progress update
