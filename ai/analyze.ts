@@ -1,6 +1,7 @@
 "use server"
 
 import { ActionState } from "@/lib/actions"
+import { prisma } from "@/lib/db"
 import { updateFile } from "@/models/files"
 import { getLLMSettings, getSettings } from "@/models/settings"
 import { AnalyzeAttachment } from "./attachments"
@@ -34,6 +35,7 @@ export async function analyzeTransaction(
 
     const result = response.output
     const tokensUsed = response.tokensUsed || 0
+    await keepOwnedCodes(userId, result)
 
     console.log("LLM response:", result)
     console.log("LLM tokens used:", tokensUsed)
@@ -53,5 +55,20 @@ export async function analyzeTransaction(
       success: false,
       error: error instanceof Error ? error.message : "Failed to analyze invoice",
     }
+  }
+}
+
+async function keepOwnedCodes(userId: string, result: Record<string, string>) {
+  for (const model of ["category", "project"] as const) {
+    const key = model === "category" ? "categoryCode" : "projectCode"
+    const value = result[key]
+    if (!value) continue
+    const match = { userId, OR: [{ code: value }, { name: { equals: value, mode: "insensitive" as const } }] }
+    const row =
+      model === "category"
+        ? await prisma.category.findFirst({ where: match })
+        : await prisma.project.findFirst({ where: match })
+    if (row) result[key] = row.code
+    else delete result[key]
   }
 }

@@ -7,7 +7,7 @@ import { ingestUnsortedFile } from "@/lib/uploads"
 import { updateUser } from "@/models/users"
 import { revalidatePath } from "next/cache"
 
-export async function uploadFilesAction(formData: FormData): Promise<ActionState<null>> {
+export async function uploadFilesAction(formData: FormData): Promise<ActionState<{ fileIds: string[] }>> {
   const user = await getCurrentUser()
   const files = formData.getAll("files") as File[]
 
@@ -24,21 +24,31 @@ export async function uploadFilesAction(formData: FormData): Promise<ActionState
     }
   }
 
-  // Process each file
-  await Promise.all(
-    files.map(async (file) => {
-      if (!(file instanceof File)) {
-        return { success: false, error: "Invalid file" }
-      }
+  const fileIds: string[] = []
+  try {
+    for (const file of files) {
+      if (!(file instanceof File)) continue
       const arrayBuffer = await file.arrayBuffer()
-      return await ingestUnsortedFile(user, {
+      const saved = await ingestUnsortedFile(user, {
         buffer: Buffer.from(arrayBuffer),
         filename: file.name,
         mimetype: file.type,
         metadata: { lastModified: file.lastModified },
       })
-    })
-  )
+      fileIds.push(saved.id)
+    }
+  } catch (error) {
+    console.error("Upload error:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Upload failed",
+      data: { fileIds },
+    }
+  }
+
+  if (fileIds.length === 0) {
+    return { success: false, error: "No files to upload" }
+  }
 
   let storageUsed = (user.storageUsed || 0) + totalFileSize
   try {
@@ -50,5 +60,5 @@ export async function uploadFilesAction(formData: FormData): Promise<ActionState
 
   revalidatePath("/unsorted")
 
-  return { success: true, error: null }
+  return { success: true, data: { fileIds } }
 }

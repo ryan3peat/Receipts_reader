@@ -1,18 +1,16 @@
 "use client"
 
-import { useNotification } from "@/app/(app)/context"
-import { uploadFilesAction } from "@/app/(app)/files/actions"
 import { uploadTransactionFilesAction } from "@/app/(app)/transactions/actions"
+import { uploadPhaseLabel, useUploadBatch } from "@/components/files/use-upload-batch"
 import { AlertCircle, CloudUpload, Loader2 } from "lucide-react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 
 export default function ScreenDropArea({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const { showNotification } = useNotification()
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState("")
+  const { phase, uploadBatch } = useUploadBatch()
   const dragCounter = useRef(0)
   const { transactionId } = useParams()
 
@@ -65,7 +63,7 @@ export default function ScreenDropArea({ children }: { children: React.ReactNode
 
       const files = e.dataTransfer.files
       if (files && files.length > 0) {
-        setIsUploading(true)
+        if (transactionId) setIsUploading(true)
         setUploadError("")
 
         try {
@@ -77,28 +75,23 @@ export default function ScreenDropArea({ children }: { children: React.ReactNode
             formData.append("files", files[i])
           }
 
-          const result = transactionId
-            ? await uploadTransactionFilesAction(formData)
-            : await uploadFilesAction(formData)
-
-          if (result.success) {
-            showNotification({ code: "sidebar.unsorted", message: "new" })
-            setTimeout(() => showNotification({ code: "sidebar.unsorted", message: "" }), 3000)
-            if (!transactionId) {
-              router.push("/unsorted")
+          if (transactionId) {
+            const result = await uploadTransactionFilesAction(formData)
+            if (!result.success) {
+              setUploadError(result.error ? result.error : "Something went wrong...")
             }
           } else {
-            setUploadError(result.error ? result.error : "Something went wrong...")
+            await uploadBatch(files)
           }
         } catch (error) {
           console.error("Upload error:", error)
           setUploadError(error instanceof Error ? error.message : "Something went wrong...")
         } finally {
-          setIsUploading(false)
+          if (transactionId) setIsUploading(false)
         }
       }
     },
-    [transactionId, router, showNotification]
+    [transactionId, uploadBatch]
   )
 
   // Add event listeners to document body
@@ -138,19 +131,22 @@ export default function ScreenDropArea({ children }: { children: React.ReactNode
         </div>
       )}
 
-      {isUploading && (
+      {(isUploading || phase !== "idle") && (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center">
             <Loader2 className="h-16 w-16 mx-auto mb-4 text-primary animate-spin" />
             <h3 className="text-xl font-semibold mb-2">
-              {transactionId ? "Adding files to transaction..." : "Uploading..."}
+              {transactionId ? "Adding files to transaction..." : uploadPhaseLabel(phase === "idle" ? "uploading" : phase)}
             </h3>
           </div>
         </div>
       )}
 
       {uploadError && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center"
+          onClick={() => setUploadError("")}
+        >
           <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center">
             <AlertCircle className="h-16 w-16 mx-auto mb-4 text-red-500" />
             <h3 className="text-xl font-semibold mb-2">Upload Error</h3>

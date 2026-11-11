@@ -167,8 +167,27 @@ export const findDuplicateTransaction = async (userId: string, data: Transaction
   return null
 }
 
+async function ownedCode(userId: string, model: "category" | "project", value: unknown): Promise<string | null> {
+  if (typeof value !== "string") return null
+  const code = value.trim()
+  if (!code || code === "-") return null
+  const match = { userId, OR: [{ code }, { name: { equals: code, mode: "insensitive" as const } }] }
+  const row =
+    model === "category"
+      ? await prisma.category.findFirst({ where: match })
+      : await prisma.project.findFirst({ where: match })
+  return row?.code ?? null
+}
+
+async function withOwnedRelations(userId: string, standard: TransactionData) {
+  standard.categoryCode = await ownedCode(userId, "category", standard.categoryCode)
+  standard.projectCode = await ownedCode(userId, "project", standard.projectCode)
+  return standard
+}
+
 export const createTransaction = async (userId: string, data: TransactionData): Promise<Transaction> => {
   const { standard, extra } = await splitTransactionDataExtraFields(data, userId)
+  await withOwnedRelations(userId, standard)
   const { getActor } = await import("@/lib/access")
   const actor = await getActor()
 
@@ -191,6 +210,7 @@ export const updateTransaction = async (id: string, userId: string, data: Transa
     throw new Error("Transaction not found")
   }
   const { standard, extra } = await splitTransactionDataExtraFields(data, userId)
+  await withOwnedRelations(userId, standard)
 
   return await prisma.transaction.update({
     where: { id },

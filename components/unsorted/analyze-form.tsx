@@ -15,16 +15,14 @@ import { FormInput, FormTextarea } from "@/components/forms/simple"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ActionState } from "@/lib/actions"
+import { requestFileAnalysis } from "@/lib/analyze-client"
 import { analyzeLimiter, analyzeProgress } from "@/lib/analyze-queue"
 import { Category, Currency, Field, File, Project, Transaction } from "@/prisma/client"
 import { format } from "date-fns"
 import { ArrowDownToLine, Brain, Loader2, Trash2 } from "lucide-react"
-import { startTransition, useEffect, useActionState, useMemo, useState } from "react"
+import { startTransition, useEffect, useActionState, useMemo, useRef, useState } from "react"
 import { useFormStatus } from "react-dom"
 import { DuplicateModal } from "../transactions/duplicate-modal"
-
-const MAX_ANALYZE_RETRIES = 8
-const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 function SaveButton({ isSaving }: { isSaving: boolean }) {
   const { pending } = useFormStatus()
@@ -55,6 +53,7 @@ export default function AnalyzeForm({
   fields,
   settings,
   analyzeConcurrency,
+  autoAnalyze = false,
 }: {
   file: File
   categories: Category[]
@@ -63,6 +62,7 @@ export default function AnalyzeForm({
   fields: Field[]
   settings: Record<string, string>
   analyzeConcurrency: number
+  autoAnalyze?: boolean
 }) {
   const { showNotification } = useNotification()
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -107,8 +107,12 @@ export default function AnalyzeForm({
       currencyCode: settings.default_currency,
       convertedTotal: 0.0,
       convertedCurrencyCode: settings.default_currency,
-      categoryCode: settings.default_category,
-      projectCode: settings.default_project,
+      categoryCode: categories.some((category) => category.code === settings.default_category)
+        ? settings.default_category
+        : "",
+      projectCode: projects.some((project) => project.code === settings.default_project)
+        ? settings.default_project
+        : "",
       issuedAt: "",
       note: "",
       text: "",
@@ -133,12 +137,15 @@ export default function AnalyzeForm({
         )
       : {}
 
-    return {
+    const merged = {
       ...baseState,
       ...extraFieldsState,
       ...cachedResults,
     }
-  }, [file.filename, settings, extraFields, file.cachedParseResult])
+    if (!categories.some((category) => category.code === merged.categoryCode)) merged.categoryCode = ""
+    if (!projects.some((project) => project.code === merged.projectCode)) merged.projectCode = ""
+    return merged
+  }, [file.filename, settings, extraFields, file.cachedParseResult, categories, projects])
   const [formData, setFormData] = useState(initialFormState)
 
   async function saveAsTransaction(formData: FormData) {
@@ -202,48 +209,32 @@ export default function AnalyzeForm({
   const startAnalyze = async () => {
     setIsAnalyzing(true)
     setAnalyzeError("")
-    analyzeProgress.setState(file.id, "queued")
-    let attempt = 0
+    setAnalyzeStep("Analysing...won't be long")
     try {
-      let response: Response
-      while (true) {
-        setAnalyzeStep(attempt < 3 ? "Analyzing..." : "Analyzing… (retrying after rate-limit)")
-        response = await analyzeLimiter.run(async () => {
-          analyzeProgress.setState(file.id, "analyzing")
-          return fetch("/api/unsorted/analyze", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ fileId: file.id }),
-          })
-        })
-        if (response.status === 429 && attempt < MAX_ANALYZE_RETRIES) {
-          analyzeProgress.setState(file.id, "queued")
-          analyzeLimiter.reduceMax()
-          attempt += 1
-          await delay(Math.min(2000 * 2 ** (attempt - 1), 30000))
-          continue
-        }
-        break
-      }
-      const results = await response.json()
-
-      console.log("Analysis results:", results)
+      const results = await requestFileAnalysis(file.id)
 
       if (!results.success) {
-        analyzeProgress.setState(file.id, "error")
         setAnalyzeError(results.error ? results.error : "Something went wrong...")
       } else {
-        analyzeProgress.setState(file.id, "done")
         setHasAnalyzed(true)
         const nonEmptyFields = Object.fromEntries(
-          Object.entries(results.data?.output || {}).filter(
-            ([, value]) => value !== null && value !== undefined && value !== ""
-          )
+          Object.entries(results.data?.output || {}).filter(([, value]) => value !== null && value !== undefined && value !== "")
         )
-        setFormData({ ...formData, ...nonEmptyFields })
+        if (
+          typeof nonEmptyFields.categoryCode === "string" &&
+          !categories.some((category) => category.code === nonEmptyFields.categoryCode)
+        ) {
+          delete nonEmptyFields.categoryCode
+        }
+        if (
+          typeof nonEmptyFields.projectCode === "string" &&
+          !projects.some((project) => project.code === nonEmptyFields.projectCode)
+        ) {
+          delete nonEmptyFields.projectCode
+        }
+        setFormData((prev) => ({ ...prev, ...nonEmptyFields }))
       }
     } catch (error) {
-      analyzeProgress.setState(file.id, "error")
       console.error("Analysis failed:", error)
       setAnalyzeError(error instanceof Error ? error.message : "Analysis failed")
     } finally {
@@ -251,6 +242,16 @@ export default function AnalyzeForm({
       setAnalyzeStep("")
     }
   }
+
+  const startAnalyzeRef = useRef(startAnalyze)
+  const autoStarted = useRef(false)
+  startAnalyzeRef.current = startAnalyze
+
+  useEffect(() => {
+    if (!autoAnalyze || file.isSplitted || hasAnalyzed || autoStarted.current) return
+    autoStarted.current = true
+    void startAnalyzeRef.current()
+  }, [autoAnalyze, file.id, file.isSplitted, hasAnalyzed])
 
   return (
     <>

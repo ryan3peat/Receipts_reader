@@ -32,6 +32,9 @@ export default async function UnsortedPage() {
   const fields = await getFields(user.id)
   const settings = await getSettings(user.id)
   const analyzeConcurrency = getAnalyzeConcurrency(settings)
+  const llmReady = getLLMSettings(settings).providers.some((provider) =>
+    provider.provider === "openai_compatible" ? Boolean(provider.baseUrl) : Boolean(provider.apiKey)
+  )
 
   return (
     <>
@@ -43,10 +46,7 @@ export default async function UnsortedPage() {
         </div>
       </header>
 
-      {config.selfHosted.isEnabled &&
-        !getLLMSettings(settings).providers.some((provider) =>
-          provider.provider === "openai_compatible" ? Boolean(provider.baseUrl) : Boolean(provider.apiKey)
-        ) && (
+      {config.selfHosted.isEnabled && !llmReady && (
           <Alert>
             <Settings className="h-4 w-4 mt-2" />
             <div className="flex flex-row justify-between pt-2">
@@ -85,6 +85,7 @@ export default async function UnsortedPage() {
                 fields={fields}
                 settings={settings}
                 analyzeConcurrency={analyzeConcurrency}
+                autoAnalyze={llmReady}
               />
             </div>
           </Card>
