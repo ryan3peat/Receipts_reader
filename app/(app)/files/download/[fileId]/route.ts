@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth"
 import { readStoredFile } from "@/lib/file-bytes"
+import { bytesForStorage } from "@/lib/files"
 import { encodeFilename } from "@/lib/utils"
 import { getFileById } from "@/models/files"
 import { NextResponse } from "next/server"
@@ -26,7 +27,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ file
     }
 
     // Return file with proper content type and encoded filename
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(bytesForStorage(fileBuffer), {
       headers: {
         "Content-Type": file.mimetype,
           "Content-Disposition": `attachment; filename*=${encodeFilename(file.filename)}`,

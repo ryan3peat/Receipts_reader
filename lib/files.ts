@@ -91,6 +91,12 @@ export async function fileExists(filePath: string) {
   }
 }
 
+export function bytesForStorage(value: Uint8Array): Uint8Array<ArrayBuffer> {
+  const copy = new Uint8Array(value.byteLength)
+  copy.set(value)
+  return copy
+}
+
 function isReadOnlyFs(error: unknown) {
   const code = (error as NodeJS.ErrnoException).code
   return code === "ENOENT" || code === "EACCES" || code === "EPERM" || code === "EROFS"

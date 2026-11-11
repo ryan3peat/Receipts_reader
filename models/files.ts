@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/db"
 import { scopeFileWhere } from "@/lib/visibility"
 import { unlink } from "fs/promises"
-import { safePathJoin, FILE_UPLOAD_PATH } from "@/lib/files"
+import { bytesForStorage, safePathJoin, FILE_UPLOAD_PATH } from "@/lib/files"
 import path from "path"
 import { cache } from "react"
 import { getTransactionById } from "./transactions"
@@ -61,9 +61,9 @@ export const createFile = async (userId: string, data: any) => {
     },
   })
   if (content) {
-    const bytes = Buffer.isBuffer(content) ? content : Buffer.from(content)
+    const source = Buffer.isBuffer(content) ? content : Buffer.from(content)
     await prisma.fileBlob.create({
-      data: { fileId: file.id, content: bytes },
+      data: { fileId: file.id, content: bytesForStorage(source) },
     })
   }
   return file

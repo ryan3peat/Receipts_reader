@@ -4,7 +4,7 @@ import { ActionState } from "@/lib/actions"
 import { requireAccounts } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
-import { getUserUploadsDirectory, safePathJoin } from "@/lib/files"
+import { bytesForStorage, getUserUploadsDirectory, safePathJoin } from "@/lib/files"
 import { MODEL_BACKUP, modelFromJSON } from "@/models/backups"
 import { DEFAULT_CATEGORIES, DEFAULT_CURRENCIES, DEFAULT_FIELDS, DEFAULT_SETTINGS } from "@/models/defaults"
 import fs from "fs/promises"
@@ -115,10 +115,11 @@ export async function restoreBackupAction(
         }
 
         const fileContents = await zipFile.async("nodebuffer")
+        const storedBytes = bytesForStorage(fileContents)
         await prisma.fileBlob.upsert({
           where: { fileId: file.id },
-          create: { fileId: file.id, content: fileContents },
-          update: { content: fileContents },
+          create: { fileId: file.id, content: storedBytes },
+          update: { content: storedBytes },
         })
         const fullFilePath = safePathJoin(userUploadsDirectory, filePathWithoutPrefix)
         if (!fullFilePath.startsWith(path.normalize(userUploadsDirectory))) {
