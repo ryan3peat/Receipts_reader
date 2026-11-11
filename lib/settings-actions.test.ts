@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/auth", () => ({ getCurrentUser: vi.fn() }))
+vi.mock("@/lib/access", () => ({ requireAccounts: vi.fn(async () => ({ ok: true })) }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("@/ai/providers/llmProvider", () => ({ testLLMProvider: vi.fn() }))
 vi.mock("@/lib/config", () => ({ default: { selfHosted: { isEnabled: false } } }))
@@ -71,6 +72,53 @@ describe.each(groups)("$name settings authorization", (group) => {
     await expect(invoke()).rejects.toBe(redirect)
 
     for (const mutation of mutations) expect(mutation).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe.each(groups)("user B cannot mutate user A's $name", (group) => {
+  const userA = "user-a"
+  const userB = "user-b"
+  const forged = { name: "Travel", code: "USD", userId: userA, user: { connect: { id: userA } } }
+  const missing = () => Object.assign(new Error(`Record to update not found for ${userA}`), { code: "P2025" })
+
+  beforeEach(() => {
+    vi.mocked(getCurrentUser).mockResolvedValue({ id: userB } as User)
+  })
+
+  it("cannot create a record owned by user A", async () => {
+    const result = await group.add(forged)
+
+    expect(result).toMatchObject({ success: true })
+    expect(group.create).toHaveBeenCalledTimes(1)
+    expect(group.create).toHaveBeenCalledWith(userB, expect.any(Object))
+    expect(group.create.mock.calls[0][0]).not.toBe(userA)
+    expect(group.create.mock.calls[0].at(-1)).not.toHaveProperty("userId")
+    expect(group.create.mock.calls[0].at(-1)).not.toHaveProperty("user")
+    expect(JSON.stringify(group.create.mock.calls[0])).not.toContain(userA)
+  })
+
+  it("cannot edit user A's record and gets the same not-found result as a missing row", async () => {
+    vi.mocked(group.update).mockRejectedValue(missing())
+
+    const result = await group.edit("travel", forged)
+
+    expect(group.update).toHaveBeenCalledWith(userB, "travel", expect.any(Object))
+    expect(group.update.mock.calls[0][0]).not.toBe(userA)
+    expect(group.update.mock.calls[0].at(-1)).not.toHaveProperty("userId")
+    expect(result).toEqual({ success: false, error: "Not found" })
+    expect(result.error).not.toContain(userA)
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("cannot delete user A's record and gets the same not-found result as a missing row", async () => {
+    vi.mocked(group.delete).mockRejectedValue(missing())
+
+    const result = await group.remove("travel")
+
+    expect(group.delete).toHaveBeenCalledWith(userB, "travel")
+    expect(result).toEqual({ success: false, error: "Not found" })
+    expect(result.error).not.toContain(userA)
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

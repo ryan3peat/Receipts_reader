@@ -1,6 +1,7 @@
 import { addProjectAction, deleteProjectAction, editProjectAction } from "@/app/(app)/settings/actions"
 import { CrudTable } from "@/components/settings/crud"
 import { SettingsPageHeader } from "@/components/settings/page-header"
+import { omitOwner } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/auth"
 import { randomHexColor } from "@/lib/utils"
 import { getProjects } from "@/models/projects"
@@ -34,11 +35,11 @@ export default async function ProjectsSettingsPage() {
         }}
         onAdd={async (data) => {
           "use server"
-          return await addProjectAction(data as Prisma.ProjectCreateInput)
+          return await addProjectAction(omitOwner(data) as Prisma.ProjectCreateInput)
         }}
         onEdit={async (code, data) => {
           "use server"
-          return await editProjectAction(code, data as Prisma.ProjectUpdateInput)
+          return await editProjectAction(code, omitOwner(data) as Prisma.ProjectUpdateInput)
         }}
       />
     </div>

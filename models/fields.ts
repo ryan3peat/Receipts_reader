@@ -17,12 +17,13 @@ export const getFields = cache(async (userId: string) => {
 })
 
 export const createField = async (userId: string, field: FieldData) => {
-  if (!field.code) {
-    field.code = codeFromName(field.name as string)
+  const fields = withoutOwner(field)
+  if (!fields.code) {
+    fields.code = codeFromName(fields.name as string)
   }
   return await prisma.field.create({
     data: {
-      ...field,
+      ...fields,
       user: {
         connect: {
           id: userId,
@@ -35,7 +36,7 @@ export const createField = async (userId: string, field: FieldData) => {
 export const updateField = async (userId: string, code: string, field: FieldData) => {
   return await prisma.field.update({
     where: { userId_code: { code, userId } },
-    data: field,
+    data: withoutOwner(field),
   })
 }
 
@@ -43,4 +44,9 @@ export const deleteField = async (userId: string, code: string) => {
   return await prisma.field.delete({
     where: { userId_code: { code, userId } },
   })
+}
+
+function withoutOwner(data: FieldData): FieldData {
+  const { userId: _userId, user: _user, ...fields } = data
+  return fields
 }

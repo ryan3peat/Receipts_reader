@@ -5,15 +5,15 @@
 
 ## Overview
 
-By default, TaxHacker's self-hosted mode (`SELF_HOSTED_MODE=true`) disables the built-in authentication system, assuming the instance runs on a trusted local network or behind a reverse proxy with its own authentication.
+By default, EF Expenses' self-hosted mode (`SELF_HOSTED_MODE=true`) disables the built-in authentication system, assuming the instance runs on a trusted local network or behind a reverse proxy with its own authentication.
 
-However, if you want to expose your self-hosted instance to the internet **and** still use TaxHacker's built-in login system, you can use this workaround.
+However, if you want to expose your self-hosted instance to the internet **and** still use EF Expenses' built-in login system, you can use this workaround.
 
 ## How It Works
 
 The approach involves:
 
-1. Running TaxHacker with `SELF_HOSTED_MODE=false` (cloud mode)
+1. Running EF Expenses with `SELF_HOSTED_MODE=false` (cloud mode)
 2. Manually creating a user via direct database access
 3. Retrieving the OTP (one-time password) from the database
 4. Using that OTP to sign in
@@ -27,7 +27,7 @@ Run with these environment variables:
 ```env
 SELF_HOSTED_MODE=false
 DISABLE_SIGNUP=true
-BASE_URL=<URL you'll use to access TaxHacker>
+BASE_URL=<URL you'll use to access EF Expenses>
 ```
 
 ### 2. Create a User Directly in the Database

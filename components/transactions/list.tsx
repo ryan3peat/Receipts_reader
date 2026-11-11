@@ -184,7 +184,15 @@ const getFieldRenderer = (field: Field): FieldRenderer => {
   }
 }
 
-export function TransactionList({ transactions, fields = [] }: { transactions: Transaction[]; fields?: Field[] }) {
+export function TransactionList({
+  transactions,
+  fields = [],
+  showSubmitter = false,
+}: {
+  transactions: Array<Transaction & { submittedBy?: { name: string; email: string } | null }>
+  fields?: Field[]
+  showSubmitter?: boolean
+}) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -295,6 +303,7 @@ export function TransactionList({ transactions, fields = [] }: { transactions: T
             <TableHead className="min-w-[30px] select-none">
               <Checkbox checked={selectedIds.length === transactions.length} onCheckedChange={toggleAllRows} />
             </TableHead>
+            {showSubmitter && <TableHead>Submitted by</TableHead>}
             {visibleFields.map((field) => (
               <TableHead
                 key={field.code}
@@ -331,6 +340,9 @@ export function TransactionList({ transactions, fields = [] }: { transactions: T
                   }}
                 />
               </TableCell>
+              {showSubmitter && (
+                <TableCell>{transaction.submittedBy?.name || transaction.submittedBy?.email || ""}</TableCell>
+              )}
               {visibleFields.map((field) => (
                 <TableCell key={field.code} className={field.renderer.classes}>
                   {renderFieldInTable(transaction, field)}
@@ -342,6 +354,7 @@ export function TransactionList({ transactions, fields = [] }: { transactions: T
         <TableFooter>
           <TableRow>
             <TableCell></TableCell>
+            {showSubmitter && <TableCell></TableCell>}
             {visibleFields.map((field) => (
               <TableCell key={field.code} className={field.renderer.classes}>
                 {field.renderer.footerValue ? field.renderer.footerValue(transactions) : ""}

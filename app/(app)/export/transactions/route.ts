@@ -1,3 +1,4 @@
+import { listMembers, requireAccounts } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import {
   fileExists,
@@ -23,6 +24,8 @@ const PROGRESS_UPDATE_INTERVAL_MS = 2000 // 2 seconds
 const EXPORT_FILE_PATH_SEPARATOR = ";"
 
 export async function GET(request: Request) {
+  const gate = await requireAccounts()
+  if (!gate.ok) return NextResponse.json({ success: false, error: gate.error }, { status: 403 })
   const url = new URL(request.url)
   const filters = Object.fromEntries(url.searchParams.entries()) as ExportFilters
   const fields = (url.searchParams.get("fields")?.split(",") ?? []) as ExportFields
@@ -30,18 +33,22 @@ export async function GET(request: Request) {
   const progressId = url.searchParams.get("progressId")
 
   const user = await getCurrentUser()
+  const members = await listMembers()
+  const submitterNames = new Map(members.map((member) => [member.id, member.name || member.email]))
   const { transactions } = await getTransactions(user.id, filters)
   const existingFields = await getFields(user.id)
 
   try {
     const fieldKeys = fields.filter((field) => existingFields.some((f) => f.code === field))
     const includeFilePaths = includeAttachments && fieldKeys.includes("files")
+    const exportKeys = [...fieldKeys, "submittedBy"]
 
     // Create a transform stream for CSV generation
-    const csvStream = format({ headers: fieldKeys, writeBOM: true, writeHeaders: false })
+    const csvStream = format({ headers: exportKeys, writeBOM: true, writeHeaders: false })
 
     // Custom CSV headers
     const headers = fieldKeys.map((field) => existingFields.find((f) => f.code === field)?.name ?? "UNKNOWN")
+    headers.push("Submitted by")
     csvStream.write(headers)
 
     // Process transactions in chunks to avoid memory issues
@@ -86,6 +93,7 @@ export async function GET(request: Request) {
             row[field.code] = value
           }
         }
+        row.submittedBy = submitterNames.get(transaction.submittedById || "") || ""
         csvStream.write(row)
       }
     }

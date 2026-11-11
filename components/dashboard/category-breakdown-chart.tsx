@@ -27,18 +27,27 @@ interface CategoryBreakdownChartProps {
   currency: string
   averages: PeriodAverage
   filters: Pick<TransactionFilters, "dateFrom" | "dateTo">
+  expensesOnly?: boolean
 }
 
-export function CategoryBreakdownChart({ expenses, income, currency, averages, filters }: CategoryBreakdownChartProps) {
+export function CategoryBreakdownChart({
+  expenses,
+  income,
+  currency,
+  averages,
+  filters,
+  expensesOnly = false,
+}: CategoryBreakdownChartProps) {
   const router = useRouter()
   const id = useId()
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [selected, setSelected] = useState<BreakdownType>("expenses")
+  const shown = expensesOnly ? "expenses" : selected
   const [activeCode, setActiveCode] = useState<string | null>(null)
   const [hasSwitched, setHasSwitched] = useState(false)
 
-  const tab = TABS.find((t) => t.value === selected)!
-  const items = selected === "expenses" ? expenses : income
+  const tab = TABS.find((t) => t.value === shown)!
+  const items = shown === "expenses" ? expenses : income
   const total = items.reduce((sum, item) => sum + item.total, 0)
   const active = items.find((item) => item.code === activeCode)
   const gap = items.length > 1 ? SEGMENT_GAP : 0
@@ -81,6 +90,7 @@ export function CategoryBreakdownChart({ expenses, income, currency, averages, f
     <Card className="flex flex-col gap-4 p-4 lg:h-[400px]">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold">By category</h3>
+        {!expensesOnly && (
         <div role="tablist" aria-label="Category breakdown" className="grid grid-cols-2 rounded-lg bg-muted p-0.5">
           {TABS.map((t, index) => {
             const isSelected = t.value === selected
@@ -108,17 +118,18 @@ export function CategoryBreakdownChart({ expenses, income, currency, averages, f
             )
           })}
         </div>
+        )}
       </div>
 
       <div
         id={`${id}-panel`}
         role="tabpanel"
-        aria-labelledby={`${id}-tab-${selected}`}
+        aria-labelledby={expensesOnly ? undefined : `${id}-tab-${shown}`}
         className="flex min-h-0 flex-1 flex-col gap-4"
       >
         <div className="relative mx-auto size-44 shrink-0">
           <svg
-            key={selected}
+            key={shown}
             viewBox={`0 0 ${SIZE} ${SIZE}`}
             className={cn(
               "size-full -rotate-90",

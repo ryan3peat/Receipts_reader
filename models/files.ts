@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/db"
+import { scopeFileWhere } from "@/lib/visibility"
 import { unlink } from "fs/promises"
 import { safePathJoin, FILE_UPLOAD_PATH } from "@/lib/files"
 import path from "path"
@@ -8,11 +9,10 @@ import { cache } from "react"
 import { getTransactionById } from "./transactions"
 
 export const getUnsortedFiles = cache(async (userId: string) => {
+  const where = { isReviewed: false, userId }
+  await scopeFileWhere(where)
   return await prisma.file.findMany({
-    where: {
-      isReviewed: false,
-      userId,
-    },
+    where,
     orderBy: {
       createdAt: "desc",
     },
@@ -20,18 +20,15 @@ export const getUnsortedFiles = cache(async (userId: string) => {
 })
 
 export const getUnsortedFilesCount = cache(async (userId: string) => {
-  return await prisma.file.count({
-    where: {
-      isReviewed: false,
-      userId,
-    },
-  })
+  const where = { isReviewed: false, userId }
+  await scopeFileWhere(where)
+  return await prisma.file.count({ where })
 })
 
 export const getFileById = cache(async (id: string, userId: string) => {
-  return await prisma.file.findFirst({
-    where: { id, userId },
-  })
+  const where = { id, userId }
+  await scopeFileWhere(where)
+  return await prisma.file.findFirst({ where })
 })
 
 export const getFilesByTransactionId = cache(async (id: string, userId: string) => {
@@ -53,17 +50,24 @@ export const getFilesByTransactionId = cache(async (id: string, userId: string) 
 })
 
 export const createFile = async (userId: string, data: any) => {
+  const { getActor } = await import("@/lib/access")
+  const actor = await getActor()
   return await prisma.file.create({
     data: {
       ...data,
       userId,
+      submittedById: actor.user.id,
     },
   })
 }
 
 export const updateFile = async (id: string, userId: string, data: any) => {
+  const existing = await getFileById(id, userId)
+  if (!existing) {
+    throw new Error("File not found")
+  }
   return await prisma.file.update({
-    where: { id, userId },
+    where: { id },
     data,
   })
 }

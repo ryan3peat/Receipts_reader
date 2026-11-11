@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { scopeTransactionWhere } from "@/lib/visibility"
 import { Field, Prisma, Transaction } from "@/prisma/client"
 import { cache } from "react"
 import { getFields } from "./fields"
@@ -31,6 +32,7 @@ export type TransactionFilters = {
   ordering?: string
   categoryCode?: string
   projectCode?: string
+  submittedById?: string
   type?: string
   page?: number
 }
@@ -78,6 +80,10 @@ export const getTransactions = cache(
         where.projectCode = filters.projectCode
       }
 
+      if (filters.submittedById) {
+        where.submittedById = filters.submittedById
+      }
+
       if (filters.type) {
         where.type = filters.type
       }
@@ -89,6 +95,8 @@ export const getTransactions = cache(
       }
     }
 
+    await scopeTransactionWhere(where)
+
     if (pagination) {
       const total = await prisma.transaction.count({ where })
       const transactions = await prisma.transaction.findMany({
@@ -96,6 +104,7 @@ export const getTransactions = cache(
         include: {
           category: true,
           project: true,
+          submittedBy: true,
         },
         orderBy,
         take: pagination?.limit,
@@ -108,6 +117,7 @@ export const getTransactions = cache(
         include: {
           category: true,
           project: true,
+          submittedBy: true,
         },
         orderBy,
       })
@@ -117,19 +127,22 @@ export const getTransactions = cache(
 )
 
 export const getTransactionById = cache(async (id: string, userId: string): Promise<Transaction | null> => {
-  return await prisma.transaction.findUnique({
-    where: { id, userId },
+  const where: Prisma.TransactionWhereInput = { id, userId }
+  await scopeTransactionWhere(where)
+  return await prisma.transaction.findFirst({
+    where,
     include: {
       category: true,
       project: true,
+      submittedBy: true,
     },
   })
 })
 
 export const getTransactionsByFileId = cache(async (fileId: string, userId: string): Promise<Transaction[]> => {
-  return await prisma.transaction.findMany({
-    where: { files: { array_contains: [fileId] }, userId },
-  })
+  const where: Prisma.TransactionWhereInput = { files: { array_contains: [fileId] }, userId }
+  await scopeTransactionWhere(where)
+  return await prisma.transaction.findMany({ where })
 })
 
 // --- 1. New Dedicated Deduplication Function ---
@@ -156,6 +169,8 @@ export const findDuplicateTransaction = async (userId: string, data: Transaction
 
 export const createTransaction = async (userId: string, data: TransactionData): Promise<Transaction> => {
   const { standard, extra } = await splitTransactionDataExtraFields(data, userId)
+  const { getActor } = await import("@/lib/access")
+  const actor = await getActor()
 
   const newTransaction = await prisma.transaction.create({
     data: {
@@ -163,6 +178,7 @@ export const createTransaction = async (userId: string, data: TransactionData): 
       extra: extra,
       items: data.items as Prisma.InputJsonValue,
       userId,
+      submittedById: actor.user.id,
     },
   })
 
@@ -170,10 +186,14 @@ export const createTransaction = async (userId: string, data: TransactionData): 
 }
 
 export const updateTransaction = async (id: string, userId: string, data: TransactionData): Promise<Transaction> => {
+  const existing = await getTransactionById(id, userId)
+  if (!existing) {
+    throw new Error("Transaction not found")
+  }
   const { standard, extra } = await splitTransactionDataExtraFields(data, userId)
 
   return await prisma.transaction.update({
-    where: { id, userId },
+    where: { id },
     data: {
       ...standard,
       extra: extra,
@@ -183,8 +203,12 @@ export const updateTransaction = async (id: string, userId: string, data: Transa
 }
 
 export const updateTransactionFiles = async (id: string, userId: string, files: string[]): Promise<Transaction> => {
+  const existing = await getTransactionById(id, userId)
+  if (!existing) {
+    throw new Error("Transaction not found")
+  }
   return await prisma.transaction.update({
-    where: { id, userId },
+    where: { id },
     data: { files },
   })
 }

@@ -23,12 +23,13 @@ export const getCategoryByCode = cache(async (userId: string, code: string) => {
 })
 
 export const createCategory = async (userId: string, category: CategoryData) => {
-  if (!category.code) {
-    category.code = codeFromName(category.name as string)
+  const fields = withoutOwner(category)
+  if (!fields.code) {
+    fields.code = codeFromName(fields.name as string)
   }
   return await prisma.category.create({
     data: {
-      ...category,
+      ...fields,
       user: {
         connect: {
           id: userId,
@@ -41,7 +42,7 @@ export const createCategory = async (userId: string, category: CategoryData) => 
 export const updateCategory = async (userId: string, code: string, category: CategoryData) => {
   return await prisma.category.update({
     where: { userId_code: { userId, code } },
-    data: category,
+    data: withoutOwner(category),
   })
 }
 
@@ -59,4 +60,9 @@ export const deleteCategory = async (userId: string, code: string) => {
   return await prisma.category.delete({
     where: { userId_code: { userId, code } },
   })
+}
+
+function withoutOwner(data: CategoryData): CategoryData {
+  const { userId: _userId, user: _user, ...fields } = data
+  return fields
 }

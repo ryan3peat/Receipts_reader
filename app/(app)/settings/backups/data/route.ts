@@ -1,3 +1,4 @@
+import { requireAccounts } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import { fileExists, getUserUploadsDirectory } from "@/lib/files"
 import { MODEL_BACKUP, modelToJSON } from "@/models/backups"
@@ -12,6 +13,8 @@ const BACKUP_VERSION = "1.0"
 const PROGRESS_UPDATE_INTERVAL_MS = 2000 // 2 seconds
 
 export async function GET(request: Request) {
+  const gate = await requireAccounts()
+  if (!gate.ok) return NextResponse.json({ success: false, error: gate.error }, { status: 403 })
   const user = await getCurrentUser()
   const userUploadsDirectory = getUserUploadsDirectory(user)
   const url = new URL(request.url)
@@ -104,7 +107,7 @@ export async function GET(request: Request) {
     return new NextResponse(archive, {
       headers: {
         "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="taxhacker-backup.zip"`,
+        "Content-Disposition": `attachment; filename="ef-expenses-backup.zip"`,
       },
     })
   } catch (error) {

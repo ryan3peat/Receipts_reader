@@ -19,7 +19,7 @@ export default function ProfileSettingsForm({ user }: { user: User }) {
 
       <form action={saveAction} className="space-y-8">
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Your TaxHacker Profile</h3>
+          <h3 className="text-lg font-semibold">Your EF Expenses Profile</h3>
           <FormAvatar
             title="Avatar"
             name="avatar"
@@ -27,6 +27,8 @@ export default function ProfileSettingsForm({ user }: { user: User }) {
             defaultValue={user.avatar ? user.avatar + "?" + user.id : ""}
           />
           <FormInput title="Account Name" name="name" defaultValue={user.name || ""} />
+          <FormInput title="Email" name="email" type="email" defaultValue={user.email || ""} />
+          <p className="text-sm text-muted-foreground">This email receives the login code when Login is turned on.</p>
           <div className="flex flex-row items-center gap-4">
             <Button type="submit" disabled={pending}>
               {pending ? "Saving..." : "Save"}
@@ -46,7 +48,7 @@ export default function ProfileSettingsForm({ user }: { user: User }) {
           <div className="space-y-1">
             <h3 className="text-lg font-semibold">Your Business Details</h3>
             <p className="text-sm text-muted-foreground">
-              Used on invoices and as defaults across the app.
+              Stored on your account.
             </p>
           </div>
           <FormInput

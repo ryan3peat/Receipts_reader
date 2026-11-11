@@ -19,9 +19,12 @@ model User {
   categories          Category[]
   projects            Project[]
   fields              Field[]
-  files               File[]
   currencies          Currency[]
-  transactions        Transaction[]
+  transactions          Transaction[] @relation("TransactionOwner")
+  submittedTransactions Transaction[] @relation("TransactionSubmitter")
+  files                 File[]        @relation("FileOwner")
+  submittedFiles        File[]        @relation("FileSubmitter")
+  role                  String        @default("accounts")
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
   stripeCustomerId    String?       @map("stripe_customer_id")
@@ -153,7 +156,9 @@ model Field {
 model File {
   id                String   @id @default(uuid()) @db.Uuid
   userId            String   @map("user_id") @db.Uuid
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User     @relation("FileOwner", fields: [userId], references: [id], onDelete: Cascade)
+  submittedById     String?  @map("submitted_by_id") @db.Uuid
+  submittedBy       User?    @relation("FileSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
   filename          String
   path              String
   mimetype          String
@@ -163,13 +168,16 @@ model File {
   cachedParseResult Json?    @map("cached_parse_result")
   createdAt         DateTime @default(now()) @map("created_at")
 
+  @@index([submittedById])
   @@map("files")
 }
 
 model Transaction {
   id                    String    @id @default(uuid()) @db.Uuid
   userId                String    @map("user_id") @db.Uuid
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User      @relation("TransactionOwner", fields: [userId], references: [id], onDelete: Cascade)
+  submittedById         String?   @map("submitted_by_id") @db.Uuid
+  submittedBy           User?     @relation("TransactionSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
   name                  String?
   description           String?
   merchant              String?
@@ -192,6 +200,7 @@ model Transaction {
   text                  String?
 
   @@index([userId])
+  @@index([submittedById])
   @@index([projectCode])
   @@index([categoryCode])
   @@index([issuedAt])

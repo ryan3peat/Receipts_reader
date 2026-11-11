@@ -17,6 +17,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { AccessToggles } from "@/components/sidebar/access-toggles"
 import { UserProfile } from "@/lib/auth"
 import config from "@/lib/config"
 import {
@@ -49,6 +50,7 @@ type SidebarApp = {
 }
 
 const settingsItems = [
+  { title: "People", href: "/settings/users", icon: User },
   { title: "Profile & Plan", href: "/settings/profile", icon: User },
   { title: "LLM settings", href: "/settings/llm", icon: Sparkles },
   { title: "Fields", href: "/settings/fields", icon: FormInput },
@@ -63,17 +65,27 @@ export function AppSidebar({
   unsortedFilesCount,
   isSelfHosted,
   apps,
+  showSettings,
+  showLoginToggle,
+  showUserView,
+  loginRequired,
+  userView,
 }: {
   profile: UserProfile
   unsortedFilesCount: number
   isSelfHosted: boolean
   apps: SidebarApp[]
+  showSettings: boolean
+  showLoginToggle: boolean
+  showUserView: boolean
+  loginRequired: boolean
+  userView: boolean
 }) {
   const { open, setOpenMobile } = useSidebar()
   const pathname = usePathname()
   const { notification } = useNotification()
-  const accountTitle = profile.name || profile.email
-  const accountSubtitle = isSelfHosted ? `Version ${config.app.version}` : profile.email
+  const accountTitle = config.app.title
+  const accountSubtitle = isSelfHosted ? `Version ${config.app.version}` : profile.name || profile.email
 
   // Hide sidebar on mobile when clicking an item
   useEffect(() => {
@@ -163,6 +175,7 @@ export function AppSidebar({
             </SidebarGroup>
           )}
 
+          {showSettings && (
           <SidebarGroup>
             <SidebarGroupLabel>Settings</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -180,12 +193,14 @@ export function AppSidebar({
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+          )}
         </SidebarContent>
         <SidebarRail />
         <SidebarFooter>
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
+                {showSettings && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <Link href="/import/csv">
@@ -194,6 +209,7 @@ export function AppSidebar({
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                )}
                 {isSelfHosted && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild>
@@ -210,6 +226,9 @@ export function AppSidebar({
                   </SidebarMenuItem>
                 )}
               </SidebarMenu>
+              {showUserView && (
+                <AccessToggles loginRequired={loginRequired} userView={userView} showLogin={showLoginToggle} />
+              )}
             </SidebarGroupContent>
           </SidebarGroup>
           {!isSelfHosted && (

@@ -7,11 +7,12 @@ import { authClient } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
-export function LoginForm({ defaultEmail }: { defaultEmail?: string }) {
+export function LoginForm({ defaultEmail, microsoftReady = false }: { defaultEmail?: string; microsoftReady?: boolean }) {
   const [email, setEmail] = useState(defaultEmail || "")
   const [otp, setOtp] = useState("")
   const [isOtpSent, setIsOtpSent] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -60,7 +61,30 @@ export function LoginForm({ defaultEmail }: { defaultEmail?: string }) {
     }
   }
 
+  const handleMicrosoft = async () => {
+    if (!microsoftReady) {
+      setError("Microsoft sign-in is waiting for the Entra app ID, secret, and tenant.")
+      return
+    }
+    setIsMicrosoftLoading(true)
+    setError(null)
+    const result = await authClient.signIn.social({
+      provider: "microsoft",
+      callbackURL: "/dashboard",
+      errorCallbackURL: "/enter",
+    })
+    if (result?.error) {
+      setError(result.error.message || "Microsoft sign-in failed")
+      setIsMicrosoftLoading(false)
+    }
+  }
+
   return (
+    <div className="flex flex-col gap-4 w-full">
+      <Button type="button" disabled={isMicrosoftLoading || isLoading} onClick={handleMicrosoft}>
+        {isMicrosoftLoading ? "Opening Microsoft..." : "Sign in with Microsoft"}
+      </Button>
+      <p className="text-center text-sm text-muted-foreground">or use an email code</p>
     <form onSubmit={isOtpSent ? handleVerifyOtp : handleSendOtp} className="flex flex-col gap-4 w-full">
       <FormInput
         title="Email"
@@ -86,8 +110,8 @@ export function LoginForm({ defaultEmail }: { defaultEmail?: string }) {
       <Button type="submit" disabled={isLoading}>
         {isLoading ? "Loading..." : isOtpSent ? "Verify Code" : "Enter"}
       </Button>
-
-      {error && <FormError className="text-center">{error}</FormError>}
     </form>
+      {error && <FormError className="text-center">{error}</FormError>}
+    </div>
   )
 }

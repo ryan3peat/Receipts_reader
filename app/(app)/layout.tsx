@@ -4,6 +4,7 @@ import MobileMenu from "@/components/sidebar/mobile-menu"
 import { AppSidebar } from "@/components/sidebar/sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
+import { getActor } from "@/lib/access"
 import { getCurrentUser, isSubscriptionExpired } from "@/lib/auth"
 import config from "@/lib/config"
 import { getApps } from "@/app/(app)/apps/common"
@@ -14,13 +15,13 @@ import { NotificationProvider } from "./context"
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | TaxHacker",
+    template: "%s | EF Expenses",
     default: config.app.title,
   },
   description: config.app.description,
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
+    icon: [{ url: "/icon.png", type: "image/png", sizes: "64x64" }],
+    shortcut: "/icon.png",
     apple: "/apple-touch-icon.png",
   },
   manifest: "/site.webmanifest",
@@ -31,7 +32,7 @@ export const viewport: Viewport = {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser()
+  const [user, actor] = await Promise.all([getCurrentUser(), getActor()])
   const [unsortedFilesCount, apps] = await Promise.all([getUnsortedFilesCount(user.id), getApps()])
 
   const userProfile = {
@@ -54,6 +55,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             profile={userProfile}
             unsortedFilesCount={unsortedFilesCount}
             isSelfHosted={config.selfHosted.isEnabled}
+            showSettings={actor.effectiveRole === "accounts"}
+            showLoginToggle={actor.realRole === "accounts" && !actor.userView}
+            showUserView={actor.realRole === "accounts"}
+            loginRequired={actor.loginRequired}
+            userView={actor.userView}
             apps={apps.map((app) => ({
               id: app.id,
               name: app.manifest.name,
@@ -61,6 +67,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             }))}
           />
           <SidebarInset className="w-full h-full mt-[60px] md:mt-0 overflow-auto">
+            {actor.userView && (
+              <div className="border-b bg-amber-50 px-4 py-2 text-sm text-amber-950">
+                User View is on. You are seeing the sales experience. Turn it off in the sidebar to return to accounts.
+              </div>
+            )}
             {isSubscriptionExpired(user) && <SubscriptionExpired />}
             {children}
           </SidebarInset>

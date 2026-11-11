@@ -1,6 +1,8 @@
+import { getActor, listMembers } from "@/lib/access"
 import { ExportTransactionsDialog } from "@/components/export/transactions"
 import { UploadButton } from "@/components/files/upload-button"
 import { TransactionSearchAndFilters } from "@/components/transactions/filters"
+import { SubmitterFilter } from "@/components/transactions/submitter-filter"
 import { TransactionList } from "@/components/transactions/list"
 import { NewTransactionDialog } from "@/components/transactions/new"
 import { Pagination } from "@/components/transactions/pagination"
@@ -22,7 +24,8 @@ const TRANSACTIONS_PER_PAGE = 500
 
 export default async function TransactionsPage({ searchParams }: { searchParams: Promise<TransactionFilters> }) {
   const { page, ...filters } = await searchParams
-  const user = await getCurrentUser()
+  const [user, actor, people] = await Promise.all([getCurrentUser(), getActor(), listMembers()])
+  const isAccounts = actor.effectiveRole === "accounts"
   const { transactions, total } = await getTransactions(user.id, filters, {
     limit: TRANSACTIONS_PER_PAGE,
     offset: ((page ?? 1) - 1) * TRANSACTIONS_PER_PAGE,
@@ -45,19 +48,26 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <span className="text-3xl tracking-tight opacity-20">{total}</span>
         </h2>
         <div className="flex gap-2">
-          <ExportTransactionsDialog fields={fields} categories={categories} projects={projects} total={total}>
-            <Download /> <span className="hidden md:block">Export</span>
-          </ExportTransactionsDialog>
+          {isAccounts && (
+            <ExportTransactionsDialog fields={fields} categories={categories} projects={projects} total={total}>
+              <Download /> <span className="hidden md:block">Export</span>
+            </ExportTransactionsDialog>
+          )}
           <NewTransactionDialog>
             <Plus /> <span className="hidden md:block">Add Transaction</span>
           </NewTransactionDialog>
         </div>
       </header>
 
-      <TransactionSearchAndFilters categories={categories} projects={projects} fields={fields} />
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <TransactionSearchAndFilters categories={categories} projects={projects} fields={fields} />
+        </div>
+        {isAccounts && <SubmitterFilter people={people} />}
+      </div>
 
       <main>
-        <TransactionList transactions={transactions} fields={fields} />
+        <TransactionList transactions={transactions} fields={fields} showSubmitter={isAccounts} />
 
         {total > TRANSACTIONS_PER_PAGE && <Pagination totalItems={total} itemsPerPage={TRANSACTIONS_PER_PAGE} />}
 

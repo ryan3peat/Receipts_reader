@@ -9,7 +9,7 @@ export default async function ProfileSettingsPage() {
     <div className="space-y-6">
       <SettingsPageHeader
         title="Profile & Plan"
-        description="Manage your account, subscription, and business details used on invoices."
+        description="Manage your account and subscription."
       />
       <div className="w-full max-w-2xl">
         <ProfileSettingsForm user={user} />

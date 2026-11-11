@@ -48,12 +48,9 @@ updates:
           - postcss
       email:
         patterns:
-          - imap-simple
-          - mailparser
           - resend
       pdf:
         patterns:
-          - "@react-pdf/renderer"
           - pdf2pic
       dnd-kit:
         patterns:

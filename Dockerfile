@@ -48,7 +48,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    cron \
     ghostscript \
     graphicsmagick \
     libwebp-dev \
@@ -69,8 +68,8 @@ COPY --from=builder /app/models ./models
 COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/next.config.ts ./
 
-COPY docker-entrypoint.sh docker-cron-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/docker-cron-entrypoint.sh
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 7331
 ENTRYPOINT ["docker-entrypoint.sh"]

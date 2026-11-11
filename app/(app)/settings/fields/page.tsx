@@ -1,6 +1,7 @@
 import { addFieldAction, deleteFieldAction, editFieldAction } from "@/app/(app)/settings/actions"
 import { CrudTable } from "@/components/settings/crud"
 import { SettingsPageHeader } from "@/components/settings/page-header"
+import { omitOwner } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/auth"
 import { getFields } from "@/models/fields"
 import { Prisma } from "@/prisma/client"
@@ -61,11 +62,11 @@ export default async function FieldsSettingsPage() {
         }}
         onAdd={async (data) => {
           "use server"
-          return await addFieldAction(data as Prisma.FieldCreateInput)
+          return await addFieldAction(omitOwner(data) as Prisma.FieldCreateInput)
         }}
         onEdit={async (code, data) => {
           "use server"
-          return await editFieldAction(code, data as Prisma.FieldUpdateInput)
+          return await editFieldAction(code, omitOwner(data) as Prisma.FieldUpdateInput)
         }}
       />
     </div>

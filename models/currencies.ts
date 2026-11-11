@@ -12,9 +12,10 @@ export const getCurrencies = cache(async (userId: string) => {
 })
 
 export const createCurrency = async (userId: string, currency: Prisma.CurrencyCreateInput) => {
+  const { userId: _userId, user: _user, ...fields } = currency
   return await prisma.currency.create({
     data: {
-      ...currency,
+      ...fields,
       user: {
         connect: {
           id: userId,
@@ -25,9 +26,10 @@ export const createCurrency = async (userId: string, currency: Prisma.CurrencyCr
 }
 
 export const updateCurrency = async (userId: string, code: string, currency: Prisma.CurrencyUpdateInput) => {
+  const { userId: _userId, user: _user, ...fields } = currency
   return await prisma.currency.update({
     where: { userId_code: { code, userId } },
-    data: currency,
+    data: fields,
   })
 }
 

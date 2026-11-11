@@ -29,7 +29,7 @@ Go to your app -> Settings -> Backups -> Download Data Archive
 
 Save .zip archive on your machine.
 
-## Step 3: Upgrade your TaxHacker instance
+## Step 3: Upgrade your EF Expenses instance
 
 Update your docker compose to latest version again.
 

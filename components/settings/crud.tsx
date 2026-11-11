@@ -219,7 +219,7 @@ export function CrudTable<T extends Record<string, unknown>>({ items, columns, o
 
   const handleAdd = async () => {
     try {
-      const result = await onAdd(newItem)
+      const result = await onAdd(withoutOwner(newItem))
       if (result.success) {
         setIsAdding(false)
         setNewItem(itemDefaults(columns))
@@ -234,7 +234,7 @@ export function CrudTable<T extends Record<string, unknown>>({ items, columns, o
   const handleEdit = async (id: string) => {
     if (!onEdit) return
     try {
-      const result = await onEdit(id, editingItem)
+      const result = await onEdit(id, withoutOwner(editingItem))
       if (result.success) {
         setEditingId(null)
         setEditingItem({})
@@ -360,6 +360,11 @@ export function CrudTable<T extends Record<string, unknown>>({ items, columns, o
     </div>
   )
 }
+function withoutOwner<T extends Record<string, unknown>>(data: Partial<T>): Partial<T> {
+  const { userId: _userId, user: _user, ...fields } = data as Partial<T> & { userId?: unknown; user?: unknown }
+  return fields as Partial<T>
+}
+
 function itemDefaults<T>(columns: CrudColumn<T>[]) {
   return columns.reduce((acc, column) => {
     acc[column.key] = column.defaultValue as T[keyof T]

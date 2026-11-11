@@ -1,5 +1,5 @@
 import config from "@/lib/config"
-import { getSelfHostedUser, getUserByEmail, getUserById, SELF_HOSTED_USER } from "@/models/users"
+import { getSelfHostedUser, getUserByEmail, SELF_HOSTED_USER } from "@/models/users"
 import { User } from "@/prisma/client"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
@@ -7,7 +7,6 @@ import { APIError } from "better-auth/api"
 import { nextCookies } from "better-auth/next-js"
 import { emailOTP } from "better-auth/plugins/email-otp"
 import { headers } from "next/headers"
-import { redirect } from "next/navigation"
 import { prisma } from "./db"
 import { resend, sendOTPCodeEmail } from "./email"
 
@@ -52,6 +51,34 @@ export const auth = betterAuth({
       generateId: "uuid",
     },
   },
+  ...(config.auth.microsoft
+    ? {
+        socialProviders: {
+          microsoft: {
+            clientId: config.auth.microsoft.clientId,
+            clientSecret: config.auth.microsoft.clientSecret,
+            tenantId: config.auth.microsoft.tenantId,
+            prompt: "select_account",
+          },
+        },
+      }
+    : {}),
+  account: {
+    accountLinking: {
+      trustedProviders: ["microsoft"],
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async () => {
+          throw new APIError("FORBIDDEN", {
+            message: "This Microsoft account is not on the EF Expenses list. Ask accounts to add you.",
+          })
+        },
+      },
+    },
+  },
   plugins: [
     emailOTP({
       disableSignUp: config.auth.disableSignup,
@@ -70,7 +97,8 @@ export const auth = betterAuth({
 })
 
 export async function getSession() {
-  if (config.selfHosted.isEnabled) {
+  const { isLoginRequired } = await import("@/lib/access")
+  if (config.selfHosted.isEnabled && !(await isLoginRequired())) {
     const user = await getSelfHostedUser()
     return user ? { user } : null
   }
@@ -81,26 +109,9 @@ export async function getSession() {
 }
 
 export async function getCurrentUser(): Promise<User> {
-  if (config.selfHosted.isEnabled) {
-    const user = await getSelfHostedUser()
-    if (user) {
-      return user
-    } else {
-      redirect(config.selfHosted.redirectUrl)
-    }
-  }
-
-  // Try to return user from session
-  const session = await getSession()
-  if (session && session.user) {
-    const user = await getUserById(session.user.id)
-    if (user) {
-      return user
-    }
-  }
-
-  // No session or user found
-  redirect(config.auth.loginUrl)
+  const { getActor } = await import("@/lib/access")
+  const actor = await getActor()
+  return actor.companyUser
 }
 
 export function isSubscriptionExpired(user: User) {

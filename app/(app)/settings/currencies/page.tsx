@@ -2,6 +2,7 @@ import CurrencyDefaultsForm from "@/components/settings/currency-defaults-form"
 import { CrudTable } from "@/components/settings/crud"
 import { SettingsPageHeader } from "@/components/settings/page-header"
 import { Separator } from "@/components/ui/separator"
+import { omitOwner } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/auth"
 import { getCurrencies } from "@/models/currencies"
 import { getSettings } from "@/models/settings"
@@ -36,11 +37,11 @@ export default async function CurrenciesSettingsPage() {
         }}
         onAdd={async (data) => {
           "use server"
-          return await addCurrencyAction(data as { code: string; name: string })
+          return await addCurrencyAction(omitOwner(data) as { code: string; name: string })
         }}
         onEdit={async (code, data) => {
           "use server"
-          return await editCurrencyAction(code, data as { name: string })
+          return await editCurrencyAction(code, omitOwner(data) as { name: string })
         }}
       />
     </div>

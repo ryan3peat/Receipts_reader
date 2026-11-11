@@ -3,32 +3,27 @@ import { loadAttachmentsForAI } from "@/ai/attachments"
 import { buildLLMPrompt } from "@/ai/prompt"
 import { fieldsToJsonSchema } from "@/ai/schema"
 import { ActionState } from "@/lib/actions"
-import { getSession, isAiBalanceExhausted, isSubscriptionExpired } from "@/lib/auth"
+import { resolveActor } from "@/lib/access"
+import { isAiBalanceExhausted, isSubscriptionExpired } from "@/lib/auth"
 import { DEFAULT_PROMPT_ANALYSE_NEW_FILE } from "@/models/defaults"
 import { getFileById } from "@/models/files"
 import { getCategories } from "@/models/categories"
 import { getFields } from "@/models/fields"
 import { getProjects } from "@/models/projects"
 import { getSettings } from "@/models/settings"
-import { getUserById, updateUser } from "@/models/users"
+import { updateUser } from "@/models/users"
 import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
-  const session = await getSession()
-  if (!session || !session.user) {
+  const actor = await resolveActor()
+  if (!actor) {
     return NextResponse.json<ActionState<AnalysisResult>>(
       { success: false, error: "Unauthorized" },
       { status: 401 }
     )
   }
 
-  const user = await getUserById(session.user.id)
-  if (!user) {
-    return NextResponse.json<ActionState<AnalysisResult>>(
-      { success: false, error: "User not found" },
-      { status: 404 }
-    )
-  }
+  const user = actor.companyUser
 
   let fileId: unknown
   try {

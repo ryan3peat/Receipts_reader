@@ -2,6 +2,7 @@ import CategoryDefaultForm from "@/components/settings/category-default-form"
 import { CrudTable } from "@/components/settings/crud"
 import { SettingsPageHeader } from "@/components/settings/page-header"
 import { Separator } from "@/components/ui/separator"
+import { omitOwner } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/auth"
 import { randomHexColor } from "@/lib/utils"
 import { getCategories } from "@/models/categories"
@@ -39,11 +40,11 @@ export default async function CategoriesSettingsPage() {
         }}
         onAdd={async (data) => {
           "use server"
-          return await addCategoryAction(data as Prisma.CategoryCreateInput)
+          return await addCategoryAction(omitOwner(data) as Prisma.CategoryCreateInput)
         }}
         onEdit={async (code, data) => {
           "use server"
-          return await editCategoryAction(code, data as Prisma.CategoryUpdateInput)
+          return await editCategoryAction(code, omitOwner(data) as Prisma.CategoryUpdateInput)
         }}
       />
     </div>

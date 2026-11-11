@@ -3,7 +3,7 @@ import { FiltersWidget } from "@/components/dashboard/filters-widget"
 import { IncomeExpenseGraph } from "@/components/dashboard/income-expense-graph"
 import { ProjectsWidget } from "@/components/dashboard/projects-widget"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getCurrentUser } from "@/lib/auth"
+import { getActor } from "@/lib/access"
 import { calcAveragePerPeriod, PeriodAverage, sumCategoryTotals } from "@/lib/stats"
 import { cn, formatCurrency } from "@/lib/utils"
 import { getProjects } from "@/models/projects"
@@ -14,14 +14,16 @@ import { ArrowDown, ArrowUp, BicepsFlexed } from "lucide-react"
 import Link from "next/link"
 
 export async function StatsWidget({ filters }: { filters: TransactionFilters }) {
-  const user = await getCurrentUser()
-  const projects = await getProjects(user.id)
+  const actor = await getActor()
+  const user = actor.companyUser
+  const salesView = actor.effectiveRole === "sales"
   const settings = await getSettings(user.id)
   const defaultCurrency = settings.default_currency || "EUR"
 
-  const stats = await getDashboardStats(user.id, filters)
+  const stats = salesView ? null : await getDashboardStats(user.id, filters)
   const statsTimeSeries = await getDetailedTimeSeriesStats(user.id, filters, defaultCurrency)
   const averages = calcAveragePerPeriod(statsTimeSeries, filters)
+  const projects = salesView ? [] : await getProjects(user.id)
   const statsPerProject = Object.fromEntries(
     await Promise.all(
       projects.map((project) => getProjectStats(user.id, project.code, filters).then((stats) => [project.code, stats]))
@@ -41,14 +43,16 @@ export async function StatsWidget({ filters }: { filters: TransactionFilters }) 
           <IncomeExpenseGraph data={statsTimeSeries} defaultCurrency={defaultCurrency} />
           <CategoryBreakdownChart
             expenses={sumCategoryTotals(statsTimeSeries, "expenses")}
-            income={sumCategoryTotals(statsTimeSeries, "income")}
+            income={salesView ? [] : sumCategoryTotals(statsTimeSeries, "income")}
             currency={defaultCurrency}
             averages={averages}
             filters={{ dateFrom: filters.dateFrom, dateTo: filters.dateTo }}
+            expensesOnly={salesView}
           />
         </div>
       )}
 
+      {!salesView && stats && (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Link href="/transactions?type=income">
           <Card className="h-full bg-gradient-to-br from-white via-green-50/30 to-emerald-50/40 border-green-200/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02] cursor-pointer">
@@ -133,12 +137,17 @@ export async function StatsWidget({ filters }: { filters: TransactionFilters }) 
           </Card>
         </Link>
       </div>
+      )}
 
-      <div>
-        <h2 className="text-2xl font-bold">Projects</h2>
-      </div>
+      {!salesView && (
+        <>
+          <div>
+            <h2 className="text-2xl font-bold">Projects</h2>
+          </div>
 
-      <ProjectsWidget projects={projects} statsPerProject={statsPerProject} />
+          <ProjectsWidget projects={projects} statsPerProject={statsPerProject} />
+        </>
+      )}
     </div>
   )
 }

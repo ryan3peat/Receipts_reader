@@ -4,13 +4,13 @@ import "./globals.css"
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | TaxHacker",
+    template: "%s | EF Expenses",
     default: config.app.title,
   },
   description: config.app.description,
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
+    icon: [{ url: "/icon.png", type: "image/png", sizes: "64x64" }],
+    shortcut: "/icon.png",
     apple: "/apple-touch-icon.png",
   },
   manifest: "/site.webmanifest",

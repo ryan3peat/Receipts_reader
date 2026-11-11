@@ -1,6 +1,7 @@
 "use server"
 
 import { ActionState } from "@/lib/actions"
+import { requireAccounts } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import { EXPORT_AND_IMPORT_FIELD_MAP } from "@/models/export_and_import"
 import { createTransaction, findDuplicateTransaction } from "@/models/transactions"
@@ -12,6 +13,8 @@ export async function parseCSVAction(
   _prevState: ActionState<string[][]> | null,
   formData: FormData
 ): Promise<ActionState<string[][]>> {
+  const gate = await requireAccounts()
+  if (!gate.ok) return { success: false, error: gate.error }
   const file = formData.get("file") as File
   if (!file) {
     return { success: false, error: "No file uploaded" }
@@ -47,6 +50,8 @@ export async function saveTransactionsAction(
   _prevState: ActionState<Transaction> | null,
   formData: FormData
 ): Promise<ActionState<Transaction>> {
+  const gate = await requireAccounts()
+  if (!gate.ok) return { success: false, error: gate.error }
   const user = await getCurrentUser()
   try {
     const rows = JSON.parse(formData.get("rows") as string) as Record<string, unknown>[]

@@ -17,8 +17,11 @@ const envSchema = z.object({
     .default("please-set-your-key-here"),
   DISABLE_SIGNUP: z.enum(["true", "false"]).default("false"),
   RESEND_API_KEY: z.string().default("please-set-your-resend-api-key-here"),
-  RESEND_FROM_EMAIL: z.string().default("TaxHacker <user@localhost>"),
+  RESEND_FROM_EMAIL: z.string().default("EF Expenses <user@localhost>"),
   RESEND_AUDIENCE_ID: z.string().default(""),
+  MICROSOFT_CLIENT_ID: z.string().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().optional(),
+  MICROSOFT_TENANT_ID: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().default(""),
   STRIPE_WEBHOOK_SECRET: z.string().default(""),
 })
@@ -27,7 +30,7 @@ const env = envSchema.parse(Object.fromEntries(Object.entries(process.env).filte
 
 const config = {
   app: {
-    title: "TaxHacker",
+    title: "EF Expenses",
     description: "Your personal AI accountant",
     version: packageJson.version || "0.0.1",
     baseURL: env.BASE_URL || `http://localhost:${env.PORT || "7331"}`,
@@ -65,6 +68,14 @@ const config = {
     secret: env.BETTER_AUTH_SECRET,
     loginUrl: "/enter",
     disableSignup: env.DISABLE_SIGNUP === "true" || env.SELF_HOSTED_MODE === "true",
+    microsoft:
+      env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET
+        ? {
+            clientId: env.MICROSOFT_CLIENT_ID,
+            clientSecret: env.MICROSOFT_CLIENT_SECRET,
+            tenantId: env.MICROSOFT_TENANT_ID || "common",
+          }
+        : null,
   },
   stripe: {
     secretKey: env.STRIPE_SECRET_KEY,

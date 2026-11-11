@@ -1,6 +1,7 @@
 "use server"
 
 import { ActionState } from "@/lib/actions"
+import { requireAccounts } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { getUserUploadsDirectory, safePathJoin } from "@/lib/files"
@@ -23,6 +24,8 @@ export async function restoreBackupAction(
   _prevState: ActionState<BackupRestoreResult> | null,
   formData: FormData
 ): Promise<ActionState<BackupRestoreResult>> {
+  const gate = await requireAccounts()
+  if (!gate.ok) return { success: false, error: gate.error }
   const user = await getCurrentUser()
   const userUploadsDirectory = getUserUploadsDirectory(user)
   const file = formData.get("file") as File
@@ -165,6 +168,8 @@ async function cleanupUserTables(userId: string) {
 }
 
 export async function resetLLMSettingsAction() {
+  const gate = await requireAccounts()
+  if (!gate.ok) redirect("/dashboard")
   const user = await getCurrentUser()
   const llmSettings = DEFAULT_SETTINGS.filter((setting) => setting.code === "prompt_analyse_new_file")
 
@@ -180,6 +185,8 @@ export async function resetLLMSettingsAction() {
 }
 
 export async function resetFieldsAndCategoriesAction() {
+  const gate = await requireAccounts()
+  if (!gate.ok) redirect("/dashboard")
   const user = await getCurrentUser()
 
   for (const category of DEFAULT_CATEGORIES) {

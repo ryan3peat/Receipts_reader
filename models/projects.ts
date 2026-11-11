@@ -23,12 +23,13 @@ export const getProjectByCode = cache(async (userId: string, code: string) => {
 })
 
 export const createProject = async (userId: string, project: ProjectData) => {
-  if (!project.code) {
-    project.code = codeFromName(project.name as string)
+  const fields = withoutOwner(project)
+  if (!fields.code) {
+    fields.code = codeFromName(fields.name as string)
   }
   return await prisma.project.create({
     data: {
-      ...project,
+      ...fields,
       user: {
         connect: {
           id: userId,
@@ -41,7 +42,7 @@ export const createProject = async (userId: string, project: ProjectData) => {
 export const updateProject = async (userId: string, code: string, project: ProjectData) => {
   return await prisma.project.update({
     where: { userId_code: { code, userId } },
-    data: project,
+    data: withoutOwner(project),
   })
 }
 
@@ -59,4 +60,9 @@ export const deleteProject = async (userId: string, code: string) => {
   return await prisma.project.delete({
     where: { userId_code: { code, userId } },
   })
+}
+
+function withoutOwner(data: ProjectData): ProjectData {
+  const { userId: _userId, user: _user, ...fields } = data
+  return fields
 }

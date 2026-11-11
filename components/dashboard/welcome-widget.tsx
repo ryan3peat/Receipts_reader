@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardTitle } from "@/components/ui/card"
 import { ColoredText } from "@/components/ui/colored-text"
-import { getCurrentUser } from "@/lib/auth"
+import { getActor } from "@/lib/access"
 import config from "@/lib/config"
 import { getSettings, updateSettings } from "@/models/settings"
 import { Banknote, ChartBarStacked, FolderOpenDot, Key, TextCursorInput, X } from "lucide-react"
@@ -10,7 +10,34 @@ import Image from "next/image"
 import Link from "next/link"
 
 export async function WelcomeWidget() {
-  const user = await getCurrentUser()
+  const actor = await getActor()
+  const user = actor.companyUser
+
+  if (actor.effectiveRole === "sales") {
+    return (
+      <Card className="flex flex-col lg:flex-row items-start gap-10 p-10 w-full">
+        <Image src="/logo/1024.png" alt="Logo" width={256} height={256} className="w-64 h-64" />
+        <div className="flex flex-col">
+          <CardTitle className="text-2xl font-bold">
+            <ColoredText>Hey, I&apos;m EF Expenses 👋</ColoredText>
+          </CardTitle>
+          <CardDescription className="mt-5">
+            <p className="mb-3">
+              I&apos;m a little expense app that helps you deal with endless receipts, checks and invoices with (you
+              guessed it) AI. Here&apos;s what I can do:
+            </p>
+            <ul className="list-disc pl-5">
+              <li>
+                <strong>Upload me a photo or a PDF</strong> and I will recognize, categorize and save it as a
+                transaction for Essential
+              </li>
+            </ul>
+          </CardDescription>
+        </div>
+      </Card>
+    )
+  }
+
   const settings = await getSettings(user.id)
 
   return (
@@ -19,7 +46,7 @@ export async function WelcomeWidget() {
       <div className="flex flex-col">
         <CardTitle className="flex items-center justify-between">
           <span className="text-2xl font-bold">
-            <ColoredText>Hey, I&apos;m TaxHacker 👋</ColoredText>
+            <ColoredText>Hey, I&apos;m EF Expenses 👋</ColoredText>
           </span>
           <Button
             variant="outline"
