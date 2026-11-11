@@ -80,7 +80,7 @@ export const deleteFile = async (id: string, userId: string) => {
 
   // Security: ensure the resolved path stays within the upload directory
   const uploadPath = process.env.UPLOAD_PATH || "./data/uploads"
-  const resolvedUploadPath = path.resolve(uploadPath)
+  const resolvedUploadPath = path.resolve(/*turbopackIgnore: true*/ uploadPath)
   const resolvedFilePath = path.resolve(resolvedUploadPath, file.path)
 
   if (!resolvedFilePath.startsWith(resolvedUploadPath + path.sep)) {

@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=26"
+    "node": "26.x"
   },
   "scripts": {
     "dev": "next dev -p 7331 --turbopack",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
     "start": "prisma migrate deploy && next start",
     "lint": "eslint .",
     "test": "vitest run",

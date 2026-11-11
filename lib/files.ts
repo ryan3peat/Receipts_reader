@@ -4,7 +4,7 @@ import { access, constants, readdir, stat } from "fs/promises"
 import path from "path"
 import config from "./config"
 
-export const FILE_UPLOAD_PATH = path.resolve(process.env.UPLOAD_PATH || "./uploads")
+export const FILE_UPLOAD_PATH = path.resolve(/*turbopackIgnore: true*/ process.env.UPLOAD_PATH || "./uploads")
 export const FILE_UNSORTED_DIRECTORY_NAME = "unsorted"
 export const FILE_PREVIEWS_DIRECTORY_NAME = "previews"
 export const FILE_STATIC_DIRECTORY_NAME = "static"
