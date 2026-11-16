@@ -9,8 +9,8 @@ import { FormError } from "../forms/error"
 
 export function UploadButton({ children, ...props }: { children: React.ReactNode } & ComponentProps<typeof Button>) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { phase, error, uploadBatch } = useUploadBatch()
-  const isBusy = phase !== "idle"
+  const { phase, progress, error, notice, uploadBatch } = useUploadBatch()
+  const isUploading = phase === "uploading"
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -36,17 +36,19 @@ export function UploadButton({ children, ...props }: { children: React.ReactNode
         onChange={handleFileChange}
       />
 
-      <Button onClick={handleButtonClick} disabled={isBusy} type="button" {...props}>
-        {isBusy ? (
+      <Button onClick={handleButtonClick} disabled={isUploading} type="button" {...props}>
+        {isUploading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {uploadPhaseLabel(phase)}
+            {uploadPhaseLabel(phase, progress)}
           </>
         ) : (
           <>{children}</>
         )}
       </Button>
 
+      {phase === "analysing" && <p className="mt-1 text-xs text-muted-foreground">{uploadPhaseLabel(phase)}</p>}
+      {notice && <p className="mt-1 text-xs text-muted-foreground">{notice}</p>}
       {error && <FormError>{error}</FormError>}
     </div>
   )

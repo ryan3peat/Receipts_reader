@@ -10,7 +10,7 @@ export default function ScreenDropArea({ children }: { children: React.ReactNode
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState("")
-  const { phase, uploadBatch } = useUploadBatch()
+  const { phase, progress, notice, uploadBatch } = useUploadBatch()
   const dragCounter = useRef(0)
   const { transactionId } = useParams()
 
@@ -131,13 +131,14 @@ export default function ScreenDropArea({ children }: { children: React.ReactNode
         </div>
       )}
 
-      {(isUploading || phase !== "idle") && (
+      {(isUploading || phase === "uploading") && (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center">
             <Loader2 className="h-16 w-16 mx-auto mb-4 text-primary animate-spin" />
             <h3 className="text-xl font-semibold mb-2">
-              {transactionId ? "Adding files to transaction..." : uploadPhaseLabel(phase === "idle" ? "uploading" : phase)}
+              {transactionId ? "Adding files to transaction..." : uploadPhaseLabel(phase, progress)}
             </h3>
+            {!transactionId && notice && <p className="text-sm text-muted-foreground">{notice}</p>}
           </div>
         </div>
       )}

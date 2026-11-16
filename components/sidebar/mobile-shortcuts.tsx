@@ -1,23 +1,38 @@
 "use client"
 
-import { uploadPhaseLabel, useUploadBatch } from "@/components/files/use-upload-batch"
+import { AnotherReceiptPrompt } from "@/components/files/another-receipt-prompt"
+import { MAX_RECEIPTS_PER_UPLOAD, uploadPhaseLabel, useUploadBatch } from "@/components/files/use-upload-batch"
 import { cn } from "@/lib/utils"
 import { Camera, Files, List, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 export function MobileShortcuts() {
   const pathname = usePathname()
   const cameraRef = useRef<HTMLInputElement>(null)
   const libraryRef = useRef<HTMLInputElement>(null)
   const [chooser, setChooser] = useState(false)
-  const { phase, uploadBatch } = useUploadBatch()
-  const isBusy = phase !== "idle"
+  const { phase, progress, error, notice, holdingAnalysis, heldCount, uploadBatch, finishUploadSession } = useUploadBatch()
+  const isUploading = phase === "uploading"
 
-  const onFiles = (files: FileList | null) => {
+  useEffect(() => {
+    if (!chooser) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setChooser(false)
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [chooser])
+
+  useEffect(() => {
+    setChooser(false)
+  }, [pathname])
+
+  const onFiles = (files: FileList | null, holdAnalysis: boolean) => {
     if (!files?.length) return
-    void uploadBatch(files)
+    setChooser(false)
+    void uploadBatch(files, { holdAnalysis })
   }
 
   const itemClass = (active: boolean) =>
@@ -35,7 +50,7 @@ export function MobileShortcuts() {
         capture="environment"
         className="hidden"
         onChange={(event) => {
-          onFiles(event.target.files)
+          onFiles(event.target.files, true)
           event.target.value = ""
         }}
       />
@@ -46,49 +61,69 @@ export function MobileShortcuts() {
         multiple
         className="hidden"
         onChange={(event) => {
-          onFiles(event.target.files)
+          onFiles(event.target.files, false)
           event.target.value = ""
         }}
       />
-      {chooser && !isBusy && (
-        <div className="absolute bottom-full left-3 mb-2 w-48 overflow-hidden rounded-lg border bg-background shadow-lg">
-          <button
-            type="button"
-            className="block w-full px-3 py-3 text-left text-sm"
-            onClick={() => {
-              setChooser(false)
-              cameraRef.current?.click()
-            }}
-          >
-            Take photo
-          </button>
-          <button
-            type="button"
-            className="block w-full border-t px-3 py-3 text-left text-sm"
-            onClick={() => {
-              setChooser(false)
-              libraryRef.current?.click()
-            }}
-          >
-            Choose from phone
-          </button>
-        </div>
+      {chooser && !holdingAnalysis && (
+        <button
+          type="button"
+          aria-label="Close upload options"
+          className="fixed inset-0 z-40 cursor-default bg-black/20"
+          onClick={() => setChooser(false)}
+        />
       )}
-      {isBusy && (
+      <div className="absolute bottom-full left-3 z-50 mb-2 flex flex-col gap-2">
+        {holdingAnalysis && (
+          <AnotherReceiptPrompt
+            atLimit={heldCount >= MAX_RECEIPTS_PER_UPLOAD}
+            onAnother={() => cameraRef.current?.click()}
+            onDone={finishUploadSession}
+          />
+        )}
+        {chooser && !holdingAnalysis && (
+          <div className="w-48 overflow-hidden rounded-lg border bg-background shadow-lg">
+            <button
+              type="button"
+              className="block w-full px-3 py-3 text-left text-sm"
+              onClick={() => {
+                setChooser(false)
+                cameraRef.current?.click()
+              }}
+            >
+              Take photo
+            </button>
+            <button
+              type="button"
+              className="block w-full border-t px-3 py-3 text-left text-sm"
+              onClick={() => {
+                setChooser(false)
+                libraryRef.current?.click()
+              }}
+            >
+              Choose from phone
+            </button>
+          </div>
+        )}
+      </div>
+      {phase !== "idle" && (
         <div className="flex items-center justify-center gap-2 border-b px-3 py-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          {uploadPhaseLabel(phase)}
+          {uploadPhaseLabel(phase, progress)}
         </div>
       )}
+      {error && <p className="border-b px-3 py-2 text-center text-xs text-red-600">{error}</p>}
+      {notice && !error && <p className="border-b px-3 py-2 text-center text-xs text-muted-foreground">{notice}</p>}
       <div className="grid grid-cols-3">
         <button
           type="button"
-          className={itemClass(false)}
-          disabled={isBusy}
+          className={itemClass(chooser)}
+          disabled={isUploading || holdingAnalysis}
+          aria-expanded={chooser}
           onClick={() => setChooser((open) => !open)}
         >
           <Camera className="h-5 w-5" />
-          {isBusy ? (phase === "uploading" ? "Uploading" : "Analysing") : "Upload"}
+          {isUploading ? "Uploading" : "Upload"}
         </button>
         <Link href="/transactions" className={itemClass(pathname.startsWith("/transactions"))}>
           <List className="h-5 w-5" />
