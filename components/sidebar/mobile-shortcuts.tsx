@@ -13,7 +13,8 @@ export function MobileShortcuts() {
   const cameraRef = useRef<HTMLInputElement>(null)
   const libraryRef = useRef<HTMLInputElement>(null)
   const [chooser, setChooser] = useState(false)
-  const { phase, progress, error, notice, holdingAnalysis, heldCount, uploadBatch, finishUploadSession } = useUploadBatch()
+  const { phase, progress, error, notice, holdingAnalysis, heldCount, uploadBatch, finishUploadSession, clearError } =
+    useUploadBatch()
   const isUploading = phase === "uploading"
 
   useEffect(() => {
@@ -112,7 +113,11 @@ export function MobileShortcuts() {
           {uploadPhaseLabel(phase, progress)}
         </div>
       )}
-      {error && <p className="border-b px-3 py-2 text-center text-xs text-red-600">{error}</p>}
+      {error && (
+        <button type="button" className="w-full border-b px-3 py-2 text-center text-xs text-red-600" onClick={clearError}>
+          {error}
+        </button>
+      )}
       {notice && !error && <p className="border-b px-3 py-2 text-center text-xs text-muted-foreground">{notice}</p>}
       <div className="grid grid-cols-3">
         <button

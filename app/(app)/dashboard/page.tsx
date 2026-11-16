@@ -8,7 +8,9 @@ import config from "@/lib/config"
 import { getUnsortedFiles } from "@/models/files"
 import { getSettings } from "@/models/settings"
 import { TransactionFilters } from "@/models/transactions"
+import { Loader2 } from "lucide-react"
 import { Metadata } from "next"
+import { Suspense } from "react"
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -31,7 +33,16 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       <Separator />
 
-      <StatsWidget filters={filters} />
+      <Suspense
+        fallback={
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Loading overview
+          </div>
+        }
+      >
+        <StatsWidget filters={filters} />
+      </Suspense>
     </div>
   )
 }

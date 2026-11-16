@@ -189,15 +189,26 @@ export default function AnalyzeForm({
     setPendingFormData(null)
     setDuplicateData(null)
   }
-  const handleReplaceOld = async () => {
-    if (!duplicateData || !pendingFormData) return
 
+  const handleKeepOlder = (deleteOther: boolean) => {
     setIsDuplicateModalOpen(false)
-    setIsSaving(true)
+    setPendingFormData(null)
+    setDuplicateData(null)
+    if (deleteOther) startTransition(() => deleteAction(file.id))
+  }
 
+  const handleKeepNewer = async (deleteOther: boolean) => {
+    if (!duplicateData || !pendingFormData) return
+    setIsDuplicateModalOpen(false)
+
+    if (!deleteOther) {
+      handleForceSave()
+      return
+    }
+
+    setIsSaving(true)
     try {
       await deleteTransactionAction(null, duplicateData.existingTransaction.id)
-
       await saveAsTransaction(pendingFormData)
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Failed to replace transaction")
@@ -275,7 +286,14 @@ export default function AnalyzeForm({
         </Button>
       )}
 
-      <div>{analyzeError && <FormError>{analyzeError}</FormError>}</div>
+      {analyzeError && (
+        <div className="mb-4 flex flex-col items-start gap-2">
+          <FormError>{analyzeError}</FormError>
+          <Button type="button" variant="outline" size="sm" onClick={() => void startAnalyze()} disabled={isAnalyzing}>
+            Retry again
+          </Button>
+        </div>
+      )}
 
       <form className="space-y-4" action={saveAsTransaction}>
         <input type="hidden" name="fileId" value={file.id} />
@@ -469,9 +487,10 @@ export default function AnalyzeForm({
         isOpen={isDuplicateModalOpen}
         onOpenChange={setIsDuplicateModalOpen}
         duplicateData={duplicateData}
-        onKeepBoth={handleForceSave} // This should trigger the action again with forceSave: true
-        onReplaceOld={handleReplaceOld}
-        onCancel={handleCancelDuplicate} // This should just close the modal
+        onKeepBoth={handleForceSave}
+        onKeepOlder={handleKeepOlder}
+        onKeepNewer={handleKeepNewer}
+        onCancel={handleCancelDuplicate}
       />
     </>
   )

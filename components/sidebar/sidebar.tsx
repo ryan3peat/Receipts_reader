@@ -82,6 +82,7 @@ export function AppSidebar({
 }) {
   const { open, setOpenMobile } = useSidebar()
   const pathname = usePathname()
+  const closeMobile = () => setOpenMobile(false)
   const { notification } = useNotification()
   const accountTitle = config.app.title
   const accountSubtitle = isSelfHosted ? `Version ${config.app.version}` : profile.name || profile.email
@@ -95,7 +96,7 @@ export function AppSidebar({
     <>
       <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
-          <Link href="/" className="flex min-w-0 items-center gap-2">
+          <Link href="/" className="flex min-w-0 items-center gap-2" onClick={closeMobile}>
             <Image src="/logo/256.png" alt="Logo" className="h-10 w-10 shrink-0 rounded-lg" width={40} height={40} />
             <div className="grid min-w-0 flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
               <span className="truncate font-semibold text-base text-black">{accountTitle}</span>
@@ -115,7 +116,7 @@ export function AppSidebar({
               <SidebarMenu>
                 <SidebarMenuItemWithHighlight href="/dashboard">
                   <SidebarMenuButton asChild>
-                    <Link href="/dashboard">
+                    <Link href="/dashboard" onClick={closeMobile}>
                       <House />
                       <span>Home</span>
                     </Link>
@@ -124,7 +125,7 @@ export function AppSidebar({
 
                 <SidebarMenuItemWithHighlight href="/transactions">
                   <SidebarMenuButton asChild>
-                    <Link href="/transactions">
+                    <Link href="/transactions" onClick={closeMobile}>
                       <FileText />
                       <span>Transactions</span>
                       {notification && notification.code === "sidebar.transactions" && notification.message && (
@@ -137,7 +138,7 @@ export function AppSidebar({
 
                 <SidebarMenuItemWithHighlight href="/unsorted">
                   <SidebarMenuButton asChild>
-                    <Link href="/unsorted">
+                    <Link href="/unsorted" onClick={closeMobile}>
                       <ClockArrowUp />
                       <span>Unsorted</span>
                       {unsortedFilesCount > 0 && (
@@ -162,7 +163,7 @@ export function AppSidebar({
                   {apps.map((app) => (
                     <SidebarMenuItemWithHighlight key={app.id} href={`/apps/${app.id}`}>
                       <SidebarMenuButton asChild>
-                        <Link href={`/apps/${app.id}`}>
+                        <Link href={`/apps/${app.id}`} onClick={closeMobile}>
                           <span className="text-base leading-none">{app.icon}</span>
                           <span>{app.name}</span>
                         </Link>
@@ -182,7 +183,7 @@ export function AppSidebar({
                 {settingsItems.map((item) => (
                   <SidebarMenuItemWithHighlight key={item.href} href={item.href}>
                     <SidebarMenuButton asChild>
-                      <Link href={item.href}>
+                      <Link href={item.href} onClick={closeMobile}>
                         <item.icon />
                         <span>{item.title}</span>
                       </Link>
@@ -202,7 +203,7 @@ export function AppSidebar({
                 {showSettings && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link href="/import/csv">
+                    <Link href="/import/csv" onClick={closeMobile}>
                       <Import />
                       Import from CSV
                     </Link>

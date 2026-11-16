@@ -2,7 +2,7 @@
 
 import { setLoginRequiredAction, setUserViewAction } from "@/app/(app)/access/actions"
 import { cn } from "@/lib/utils"
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState } from "react"
 
 function Switch({
   label,
@@ -50,34 +50,61 @@ export function AccessToggles({
   userView: boolean
   showLogin: boolean
 }) {
-  const [pending, startTransition] = useTransition()
+  const pendingRef = useRef(false)
+  const [pending, setPending] = useState(false)
+  const [loginOn, setLoginOn] = useState(loginRequired)
+  const [userOn, setUserOn] = useState(userView)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoginOn(loginRequired)
+  }, [loginRequired])
+
+  useEffect(() => {
+    setUserOn(userView)
+  }, [userView])
 
   return (
     <div className="group-data-[collapsible=icon]:hidden">
       {showLogin && (
         <Switch
           label="Login"
-          checked={loginRequired}
+          checked={loginOn}
           disabled={pending}
           onCheckedChange={(checked) => {
+            if (pendingRef.current) return
+            pendingRef.current = true
             setError(null)
-            startTransition(async () => {
-              const result = await setLoginRequiredAction(checked)
-              if (!result.success) setError(result.error)
+            setLoginOn(checked)
+            setPending(true)
+            void setLoginRequiredAction(checked).then((result) => {
+              pendingRef.current = false
+              setPending(false)
+              if (!result.success) {
+                setLoginOn(!checked)
+                setError(result.error)
+              }
             })
           }}
         />
       )}
       <Switch
         label="User View"
-        checked={userView}
+        checked={userOn}
         disabled={pending}
         onCheckedChange={(checked) => {
+          if (pendingRef.current) return
+          pendingRef.current = true
           setError(null)
-          startTransition(async () => {
-            const result = await setUserViewAction(checked)
-            if (!result.success) setError(result.error)
+          setUserOn(checked)
+          setPending(true)
+          void setUserViewAction(checked).then((result) => {
+            pendingRef.current = false
+            setPending(false)
+            if (!result.success) {
+              setUserOn(!checked)
+              setError(result.error)
+            }
           })
         }}
       />

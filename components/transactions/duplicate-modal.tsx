@@ -5,14 +5,15 @@ import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react"
 import { format } from "date-fns"
 import { ActionState } from "@/lib/actions"
 import { Transaction } from "@/prisma/client"
+import { useEffect, useState } from "react"
 
 interface DuplicateModalProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  // Use the concrete Transaction type for the ActionState
   duplicateData: ActionState<Transaction>["duplicateData"] | null
   onKeepBoth: () => void
-  onReplaceOld: () => void
+  onKeepOlder: (deleteOther: boolean) => void
+  onKeepNewer: (deleteOther: boolean) => void
   onCancel: () => void
 }
 
@@ -21,10 +22,16 @@ export function DuplicateModal({
   onOpenChange,
   duplicateData,
   onKeepBoth,
-  onReplaceOld,
+  onKeepOlder,
+  onKeepNewer,
   onCancel,
 }: DuplicateModalProps) {
-  // If no data, render nothing to avoid errors
+  const [choice, setChoice] = useState<"older" | "newer" | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) setChoice(null)
+  }, [isOpen])
+
   if (!duplicateData) return null
 
   // Safely extract the new data for readability
@@ -32,7 +39,13 @@ export function DuplicateModal({
   const existingData = duplicateData.existingTransaction
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        onOpenChange(open)
+        if (!open) onCancel()
+      }}
+    >
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
@@ -113,37 +126,54 @@ export function DuplicateModal({
           </Card>
         </div>
 
-        {/* ACTION BUTTONS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-4 border-t">
-          {/* LEFT: Keep Older (Discard New) */}
-          <Button
-            variant="outline"
-            onClick={onCancel}
-            className="w-full border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-red-900/50 dark:hover:bg-red-900/20"
-          >
-            <XCircle className="h-4 w-4 mr-2" />
-            Keep Older
-          </Button>
+        {choice ? (
+          <div className="mt-6 flex flex-col gap-3 border-t pt-4">
+            <p className="text-sm font-medium">Would you like to delete the other one?</p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={() => (choice === "older" ? onKeepOlder(true) : onKeepNewer(true))}
+              >
+                Yes
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => (choice === "older" ? onKeepOlder(false) : onKeepNewer(false))}
+              >
+                No
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setChoice("older")}
+              className="w-full border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-red-900/50 dark:hover:bg-red-900/20"
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Keep Older
+            </Button>
 
-          {/* MIDDLE: Keep Both (Default Green) */}
-          <Button
-            onClick={onKeepBoth}
-            className="w-full bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
-          >
-            <CheckCircle2 className="h-4 w-4 mr-2" />
-            Keep Both
-          </Button>
+            <Button
+              onClick={onKeepBoth}
+              className="w-full bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Keep Both
+            </Button>
 
-          {/* RIGHT: Keep Newer (Replace) */}
-          <Button
-            variant="outline"
-            onClick={onReplaceOld}
-            className="w-full border-blue-200 hover:bg-blue-50 hover:text-blue-600 dark:border-blue-900/50 dark:hover:bg-blue-900/20"
-          >
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Keep Newer
-          </Button>
-        </div>
+            <Button
+              variant="outline"
+              onClick={() => setChoice("newer")}
+              className="w-full border-blue-200 hover:bg-blue-50 hover:text-blue-600 dark:border-blue-900/50 dark:hover:bg-blue-900/20"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Keep Newer
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

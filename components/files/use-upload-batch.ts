@@ -11,7 +11,7 @@ import {
   type UploadProgress,
 } from "@/lib/upload-progress"
 import { useRouter } from "next/navigation"
-import { useRef, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 
 export type { UploadPhase, UploadProgress }
 export { MAX_RECEIPTS_PER_UPLOAD, uploadPhaseLabel }
@@ -40,10 +40,6 @@ export function useUploadBatch() {
   const holdAnalysis = useRef(false)
   const heldCountRef = useRef(0)
   const analysisToken = useRef(0)
-  const routerRef = useRef(router)
-  const notifyRef = useRef(showNotification)
-  routerRef.current = router
-  notifyRef.current = showNotification
 
   const syncHeld = (count: number) => {
     heldCountRef.current = count
@@ -57,26 +53,18 @@ export function useUploadBatch() {
     }
     const token = ++analysisToken.current
     setPhase("analysing")
-    notifyRef.current({ code: "sidebar.unsorted", message: "new" })
-    setTimeout(() => notifyRef.current({ code: "sidebar.unsorted", message: "" }), 3000)
-    routerRef.current.push("/unsorted")
-    routerRef.current.refresh()
-    void Promise.all(fileIds.map((fileId) => requestFileAnalysis(fileId)))
-      .catch((caught) => {
-        const message = caught instanceof Error ? caught.message : "Something went wrong..."
-        setError(message)
-        notifyRef.current({ code: "global.banner", message, type: "failed" })
-      })
-      .finally(() => {
+    showNotification({ code: "sidebar.unsorted", message: "new" })
+    setTimeout(() => showNotification({ code: "sidebar.unsorted", message: "" }), 3000)
+    router.push("/unsorted")
+    router.refresh()
+    void Promise.all(fileIds.map((fileId) => requestFileAnalysis(fileId))).finally(() => {
         if (analysisToken.current === token) {
           setPhase((current) => (current === "analysing" ? "idle" : current))
         }
       })
   }
 
-  const pumpRef = useRef<() => Promise<void>>(async () => {})
-
-  pumpRef.current = async () => {
+  const pump = async (): Promise<void> => {
     if (pumping.current) return
     pumping.current = true
     setPhase("uploading")
@@ -102,7 +90,10 @@ export function useUploadBatch() {
             break
           }
         } catch (caught) {
-          uploadError = caught instanceof Error ? caught.message : "Something went wrong..."
+          const message = caught instanceof Error ? caught.message : ""
+          uploadError = /failed to fetch/i.test(message)
+            ? "The upload didn't reach the server. The connection dropped."
+            : message || "Something went wrong..."
           const rest = queue.current.splice(0)
           rest.forEach((item) => item.done())
           break
@@ -113,14 +104,14 @@ export function useUploadBatch() {
     } finally {
       pumping.current = false
       if (queue.current.length > 0) {
-        void pumpRef.current()
+        void pump()
         return
       }
       uploadedCount.current = 0
       setProgress(EMPTY_PROGRESS)
       if (uploadError) {
         setError(uploadError)
-        notifyRef.current({ code: "global.banner", message: uploadError, type: "failed" })
+        showNotification({ code: "global.banner", message: uploadError, type: "failed" })
       }
       if (!holdAnalysis.current) {
         const ids = pendingIds.current.splice(0)
@@ -169,7 +160,7 @@ export function useUploadBatch() {
     const total = uploadedCount.current + queue.current.length
     setProgress({ current: pumping.current ? uploadedCount.current : 1, total })
     setPhase("uploading")
-    void pumpRef.current()
+    void pump()
     return batchDone
   }
 
@@ -183,6 +174,8 @@ export function useUploadBatch() {
     startAnalysis(ids)
   }
 
+  const clearError = useCallback(() => setError(""), [])
+
   return {
     phase,
     progress,
@@ -190,7 +183,7 @@ export function useUploadBatch() {
     notice,
     holdingAnalysis,
     heldCount,
-    clearError: () => setError(""),
+    clearError,
     uploadBatch,
     finishUploadSession,
   }
