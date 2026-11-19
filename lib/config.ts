@@ -22,6 +22,7 @@ const envSchema = z.object({
   MICROSOFT_CLIENT_ID: z.string().optional(),
   MICROSOFT_CLIENT_SECRET: z.string().optional(),
   MICROSOFT_TENANT_ID: z.string().optional(),
+  MASTER_ADMIN_EMAIL: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().default(""),
   STRIPE_WEBHOOK_SECRET: z.string().default(""),
 })
@@ -76,6 +77,7 @@ const config = {
             tenantId: env.MICROSOFT_TENANT_ID || "common",
           }
         : null,
+    masterAdminEmail: env.MASTER_ADMIN_EMAIL?.trim().toLowerCase() || null,
   },
   stripe: {
     secretKey: env.STRIPE_SECRET_KEY,

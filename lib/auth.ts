@@ -59,6 +59,8 @@ export const auth = betterAuth({
             clientSecret: config.auth.microsoft.clientSecret,
             tenantId: config.auth.microsoft.tenantId,
             prompt: "select_account",
+            // The photo would be stored as a large inline image on the user and in the session cookie.
+            disableProfilePhoto: true,
           },
         },
       }
@@ -66,6 +68,8 @@ export const auth = betterAuth({
   account: {
     accountLinking: {
       trustedProviders: ["microsoft"],
+      // Nobody edits a profile in the app: the name is taken from Microsoft the first time a person signs in.
+      updateUserInfoOnLink: true,
     },
   },
   databaseHooks: {

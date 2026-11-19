@@ -68,12 +68,10 @@ export default function SidebarUser({ profile, isSelfHosted }: { profile: UserPr
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link href="/settings/profile" className="flex items-center gap-2">
-              <Sparkles />
-              <span className="truncate">{PLANS[profile.membershipPlan as keyof typeof PLANS].name}</span>
-              <span className="ml-auto text-xs text-muted-foreground">{formatBytes(profile.storageUsed)} used</span>
-            </Link>
+          <DropdownMenuItem className="flex items-center gap-2">
+            <Sparkles />
+            <span className="truncate">{PLANS[profile.membershipPlan as keyof typeof PLANS].name}</span>
+            <span className="ml-auto text-xs text-muted-foreground">{formatBytes(profile.storageUsed)} used</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

@@ -51,7 +51,6 @@ type SidebarApp = {
 
 const settingsItems = [
   { title: "People", href: "/settings/users", icon: User },
-  { title: "Profile & Plan", href: "/settings/profile", icon: User },
   { title: "LLM settings", href: "/settings/llm", icon: Sparkles },
   { title: "Fields", href: "/settings/fields", icon: FormInput },
   { title: "Categories", href: "/settings/categories", icon: Tags },

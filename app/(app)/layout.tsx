@@ -51,7 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             unsortedFilesCount={unsortedFilesCount}
             isSelfHosted={config.selfHosted.isEnabled}
             showSettings={actor.effectiveRole === "accounts"}
-            showLoginToggle={actor.realRole === "accounts" && !actor.userView}
+            showLoginToggle={actor.isMaster && actor.realRole === "accounts" && !actor.userView}
             showUserView={actor.realRole === "accounts"}
             loginRequired={actor.loginRequired}
             userView={actor.userView}

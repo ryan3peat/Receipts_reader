@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const portalSession = await stripeClient.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${request.nextUrl.origin}/settings/profile`,
+      return_url: `${request.nextUrl.origin}/dashboard`,
     })
 
     return NextResponse.redirect(portalSession.url)

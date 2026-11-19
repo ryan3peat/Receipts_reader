@@ -8,22 +8,18 @@ import {
   projectFormSchema,
   settingsFormSchema,
 } from "@/forms/settings"
-import { userFormSchema } from "@/forms/users"
 import { ActionState } from "@/lib/actions"
 import { requireAccounts } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
-import { uploadStaticImage } from "@/lib/uploads"
 import { codeFromName, randomHexColor } from "@/lib/utils"
 import { createCategory, deleteCategory, updateCategory } from "@/models/categories"
 import { createCurrency, deleteCurrency, updateCurrency } from "@/models/currencies"
 import { createField, deleteField, updateField } from "@/models/fields"
 import { createProject, deleteProject, updateProject } from "@/models/projects"
 import { SELF_HOSTED_ONLY_SETTINGS, SettingsMap, updateSettings } from "@/models/settings"
-import { getUserByEmail, updateUser } from "@/models/users"
-import { Prisma, User } from "@/prisma/client"
+import { Prisma } from "@/prisma/client"
 import { revalidatePath } from "next/cache"
-import path from "path"
 
 const SELF_HOSTED_ONLY_SETTINGS_SET = new Set<string>(SELF_HOSTED_ONLY_SETTINGS)
 
@@ -89,73 +85,6 @@ export async function testLLMProviderAction(
     baseUrl,
   }
   return testLLMProvider(config)
-}
-
-export async function saveProfileAction(
-  _prevState: ActionState<User> | null,
-  formData: FormData
-): Promise<ActionState<User>> {
-  const denied = await accountsOnly()
-  if (denied) return denied
-  const user = await getCurrentUser()
-  const validatedForm = userFormSchema.safeParse(Object.fromEntries(formData))
-
-  if (!validatedForm.success) {
-    return { success: false, error: validatedForm.error.message }
-  }
-
-  // Upload avatar
-  let avatarUrl = user.avatar
-  const avatarFile = formData.get("avatar") as File | null
-  if (avatarFile instanceof File && avatarFile.size > 0) {
-    try {
-      const uploadedAvatarPath = await uploadStaticImage(user, avatarFile, "avatar.webp", 500, 500)
-      avatarUrl = `/files/static/${path.basename(uploadedAvatarPath)}`
-    } catch (error) {
-      return { success: false, error: "Failed to upload avatar: " + error }
-    }
-  }
-
-  // Upload business logo
-  let businessLogoUrl = user.businessLogo
-  const businessLogoFile = formData.get("businessLogo") as File | null
-  if (businessLogoFile instanceof File && businessLogoFile.size > 0) {
-    try {
-      const uploadedBusinessLogoPath = await uploadStaticImage(user, businessLogoFile, "businessLogo.png", 500, 500)
-      businessLogoUrl = `/files/static/${path.basename(uploadedBusinessLogoPath)}`
-    } catch (error) {
-      return { success: false, error: "Failed to upload business logo: " + error }
-    }
-  }
-
-  const email = validatedForm.data.email?.trim().toLowerCase()
-  if (email && email !== user.email) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return { success: false, error: "Enter a valid email address" }
-    }
-    const existing = await getUserByEmail(email)
-    if (existing && existing.id !== user.id) {
-      return { success: false, error: "That email is already in use" }
-    }
-  }
-
-  // Update user
-  await updateUser(user.id, {
-    name: validatedForm.data.name !== undefined ? validatedForm.data.name : user.name,
-    ...(email ? { email, ...(email !== user.email ? { emailVerified: true } : {}) } : {}),
-    avatar: avatarUrl,
-    businessName: validatedForm.data.businessName !== undefined ? validatedForm.data.businessName : user.businessName,
-    businessAddress:
-      validatedForm.data.businessAddress !== undefined ? validatedForm.data.businessAddress : user.businessAddress,
-    businessBankDetails:
-      validatedForm.data.businessBankDetails !== undefined
-        ? validatedForm.data.businessBankDetails
-        : user.businessBankDetails,
-    businessLogo: businessLogoUrl,
-  })
-
-  revalidatePath("/settings/profile")
-  return { success: true }
 }
 
 export async function addProjectAction(data: Prisma.ProjectCreateInput) {

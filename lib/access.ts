@@ -1,5 +1,6 @@
 import { ADMIN_BRIDGE_COOKIE, LOGIN_COOKIE, LOGIN_SETTING, USER_VIEW_COOKIE } from "@/lib/access-cookies"
 import { prisma } from "@/lib/db"
+import { isMasterAdminEmail } from "@/lib/master-admin"
 import { getSettings, updateSettings } from "@/models/settings"
 import { getOrCreateSelfHostedUser, getSelfHostedUser, getUserById } from "@/models/users"
 import { User } from "@/prisma/client"
@@ -18,9 +19,12 @@ export type Actor = {
   effectiveRole: AppRole
   loginRequired: boolean
   userView: boolean
+  isMaster: boolean
 }
 
 function roleOf(user: User): AppRole {
+  // The Master Admin can never be locked out by a role stored in the database.
+  if (isMasterAdminEmail(user.email)) return "accounts"
   return user.role === "sales" ? "sales" : "accounts"
 }
 
@@ -65,6 +69,9 @@ export const resolveActor = cache(async (): Promise<Actor | null> => {
     effectiveRole: userView ? "sales" : realRole,
     loginRequired,
     userView,
+    // The default account counts as well: it is everyone while Login is off, and afterwards only the browser
+    // that turned Login on, which is the way back in if Microsoft sign-in ever fails.
+    isMaster: user.id === companyUser.id || isMasterAdminEmail(user.email),
   }
 })
 
@@ -80,6 +87,15 @@ export async function requireAccounts() {
     return { ok: false as const, error: "Only accounts can do that" }
   }
   return { ok: true as const, actor }
+}
+
+export async function requireMasterAdmin() {
+  const gate = await requireAccounts()
+  if (!gate.ok) return gate
+  if (!gate.actor.isMaster) {
+    return { ok: false as const, error: "Only the Master Admin can do that" }
+  }
+  return gate
 }
 
 export async function setLoginRequired(enabled: boolean) {

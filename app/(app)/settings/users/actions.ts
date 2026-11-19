@@ -1,19 +1,20 @@
 "use server"
 
-import { requireAccounts } from "@/lib/access"
+import { requireMasterAdmin } from "@/lib/access"
 import { prisma } from "@/lib/db"
-import { getUserByEmail } from "@/models/users"
+import { isMasterAdminEmail } from "@/lib/master-admin"
+import { getUserByEmail, getUserById } from "@/models/users"
 import { revalidatePath } from "next/cache"
 
 export async function addMemberAction(_prev: { success: boolean; error?: string } | null, formData: FormData) {
-  const gate = await requireAccounts()
+  const gate = await requireMasterAdmin()
   if (!gate.ok) return { success: false, error: gate.error }
 
   const email = String(formData.get("email") || "")
     .trim()
     .toLowerCase()
   const name = String(formData.get("name") || "").trim()
-  const role = formData.get("role") === "accounts" ? "accounts" : "sales"
+  const role = formData.get("role") === "accounts" || isMasterAdminEmail(email) ? "accounts" : "sales"
 
   if (!email.includes("@") || email.endsWith("@localhost")) {
     return { success: false, error: "Enter a real email address" }
@@ -37,11 +38,17 @@ export async function addMemberAction(_prev: { success: boolean; error?: string 
 }
 
 export async function updateMemberRoleAction(userId: string, role: "accounts" | "sales") {
-  const gate = await requireAccounts()
+  const gate = await requireMasterAdmin()
   if (!gate.ok) return { success: false, error: gate.error }
 
   if (userId === gate.actor.companyUser.id && role !== "accounts") {
     return { success: false, error: "The default account stays an admin" }
+  }
+
+  const target = await getUserById(userId)
+  if (!target) return { success: false, error: "Not found" }
+  if (isMasterAdminEmail(target.email) && role !== "accounts") {
+    return { success: false, error: "The Master Admin stays an admin" }
   }
 
   if (role === "sales") {

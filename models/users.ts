@@ -10,7 +10,7 @@ export const SELF_HOSTED_USER = {
   membershipPlan: "unlimited",
 }
 
-// The default account owns all company data, so it must still be found after its email is changed in Profile.
+// The default account owns all company data, so it must still be found even if its email is ever changed.
 // It is always the earliest user: nobody else can be added until it exists.
 async function findDefaultAccount() {
   const byEmail = await prisma.user.findFirst({
@@ -75,6 +75,15 @@ export const getUserByStripeCustomerId = cache(async (customerId: string) => {
     where: { stripeCustomerId: customerId },
   })
 })
+
+// Called when Login is turned on, so the Master Admin can always sign in and manage everyone else.
+export async function ensureMasterAdminUser(email: string) {
+  return await prisma.user.upsert({
+    where: { email },
+    update: { role: "accounts" },
+    create: { email, name: email, role: "accounts", membershipPlan: "unlimited", emailVerified: true },
+  })
+}
 
 export function updateUser(userId: string, data: Prisma.UserUpdateInput) {
   return prisma.user.update({
