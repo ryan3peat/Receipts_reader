@@ -26,5 +26,6 @@ export const config = {
     "/unsorted/:path*",
     "/files/:path*",
     "/dashboard/:path*",
+    "/employees/:path*",
   ],
 }

@@ -1,8 +1,10 @@
 "use server"
 
 import { transactionFormSchema } from "@/forms/transactions"
+import { requireAccounts } from "@/lib/access"
 import { ActionState } from "@/lib/actions"
 import { getCurrentUser, isSubscriptionExpired } from "@/lib/auth"
+import { isManualTransactionStatus } from "@/lib/transaction-status"
 import {
   getDirectorySize,
   getTransactionFileUploadPath,
@@ -15,6 +17,7 @@ import { updateField } from "@/models/fields"
 import { createFile, deleteFile } from "@/models/files"
 import {
   bulkDeleteTransactions,
+  bulkSetTransactionStatus,
   createTransaction,
   deleteTransaction,
   getTransactionById,
@@ -229,12 +232,41 @@ export async function uploadTransactionFilesAction(formData: FormData): Promise<
 export async function bulkDeleteTransactionsAction(transactionIds: string[]) {
   try {
     const user = await getCurrentUser()
-    await bulkDeleteTransactions(transactionIds, user.id)
+    const ids = Array.isArray(transactionIds)
+      ? [...new Set(transactionIds.filter((id) => typeof id === "string"))]
+      : []
+    const { count } = await bulkDeleteTransactions(ids, user.id)
     revalidatePath("/transactions")
+    if (count < ids.length) {
+      return {
+        success: false,
+        error: `Deleted ${count} of ${ids.length}. The rest no longer exist or are not yours to delete.`,
+      }
+    }
     return { success: true }
   } catch (error) {
     console.error("Failed to delete transactions:", error)
     return { success: false, error: "Failed to delete transactions" }
+  }
+}
+
+export async function bulkSetTransactionStatusAction(transactionIds: string[], status: string) {
+  const gate = await requireAccounts()
+  if (!gate.ok) return { success: false, error: gate.error }
+  if (!isManualTransactionStatus(status)) return { success: false, error: "Unknown status" }
+
+  try {
+    const user = await getCurrentUser()
+    const ids = Array.isArray(transactionIds)
+      ? [...new Set(transactionIds.filter((id) => typeof id === "string"))]
+      : []
+    const { count } = await bulkSetTransactionStatus(ids, user.id, status)
+    revalidatePath("/transactions")
+    revalidatePath("/employees")
+    return { success: true, count, skipped: ids.length - count }
+  } catch (error) {
+    console.error("Failed to update transaction status:", error)
+    return { success: false, error: "Failed to update status" }
   }
 }
 

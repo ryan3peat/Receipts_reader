@@ -33,6 +33,7 @@ import {
   Tags,
   Upload,
   User,
+  Users,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -151,6 +152,17 @@ export function AppSidebar({
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItemWithHighlight>
+
+                {showSettings && (
+                  <SidebarMenuItemWithHighlight href="/employees">
+                    <SidebarMenuButton asChild>
+                      <Link href="/employees" onClick={closeMobile}>
+                        <Users />
+                        <span>Employees</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItemWithHighlight>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

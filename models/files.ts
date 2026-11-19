@@ -2,17 +2,21 @@
 
 import { prisma } from "@/lib/db"
 import { scopeFileWhere } from "@/lib/visibility"
+import type { Prisma } from "@/prisma/client"
 import { unlink } from "fs/promises"
 import { bytesForStorage, safePathJoin, FILE_UPLOAD_PATH } from "@/lib/files"
 import path from "path"
 import { cache } from "react"
 import { getTransactionById } from "./transactions"
 
-export const getUnsortedFiles = cache(async (userId: string) => {
-  const where = { isReviewed: false, userId }
+export const getUnsortedFiles = cache(async (userId: string, submittedById?: string) => {
+  const where: Prisma.FileWhereInput = { isReviewed: false, userId }
+  if (submittedById) where.submittedById = submittedById
+  // Sales scoping runs last so it always wins over the requested filter.
   await scopeFileWhere(where)
   return await prisma.file.findMany({
     where,
+    include: { submittedBy: { select: { name: true, email: true } } },
     orderBy: {
       createdAt: "desc",
     },

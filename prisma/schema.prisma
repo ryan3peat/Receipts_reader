@@ -195,6 +195,7 @@ model Transaction {
   convertedTotal        Int?      @map("converted_total")
   convertedCurrencyCode String?   @map("converted_currency_code")
   type                  String?   @default("expense")
+  status                String    @default("new")
   items                 Json      @default("[]")
   note                  String?
   files                 Json      @default("[]")
@@ -216,6 +217,7 @@ model Transaction {
   @@index([name])
   @@index([merchant])
   @@index([total])
+  @@index([status])
   @@map("transactions")
 }
 

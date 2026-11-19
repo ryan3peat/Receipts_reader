@@ -5,7 +5,15 @@ import { File } from "@/prisma/client"
 import { Cake, FilePlus } from "lucide-react"
 import Link from "next/link"
 
-export default function DashboardUnsortedWidget({ files }: { files: File[] }) {
+type UnsortedFile = File & { submittedBy?: { name: string; email: string } | null }
+
+export default function DashboardUnsortedWidget({
+  files,
+  showSubmitter = false,
+}: {
+  files: UnsortedFile[]
+  showSubmitter?: boolean
+}) {
   return (
     <Card className="w-full bg-accent">
       <CardHeader>
@@ -27,7 +35,11 @@ export default function DashboardUnsortedWidget({ files }: { files: File[] }) {
                 <FilePlus className="w-8 h-8" />
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate text-xs font-semibold">{file.filename}</span>
-                  <span className="truncate text-xs">{file.mimetype}</span>
+                  <span className="truncate text-xs">
+                    {showSubmitter
+                      ? `Uploaded by ${file.submittedBy?.name || file.submittedBy?.email || "Unknown"}`
+                      : file.mimetype}
+                  </span>
                 </div>
               </div>
             </Link>

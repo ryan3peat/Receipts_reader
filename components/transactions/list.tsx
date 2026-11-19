@@ -1,6 +1,7 @@
 "use client"
 
 import { BulkActionsMenu } from "@/components/transactions/bulk-actions"
+import { StatusBadge } from "@/components/transactions/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -188,10 +189,12 @@ export function TransactionList({
   transactions,
   fields = [],
   showSubmitter = false,
+  showStatus = false,
 }: {
   transactions: Array<Transaction & { submittedBy?: { name: string; email: string } | null }>
   fields?: Field[]
   showSubmitter?: boolean
+  showStatus?: boolean
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const router = useRouter()
@@ -304,6 +307,7 @@ export function TransactionList({
               <Checkbox checked={selectedIds.length === transactions.length} onCheckedChange={toggleAllRows} />
             </TableHead>
             {showSubmitter && <TableHead>Submitted by</TableHead>}
+            {showStatus && <TableHead>Status</TableHead>}
             {visibleFields.map((field) => (
               <TableHead
                 key={field.code}
@@ -343,6 +347,11 @@ export function TransactionList({
               {showSubmitter && (
                 <TableCell>{transaction.submittedBy?.name || transaction.submittedBy?.email || ""}</TableCell>
               )}
+              {showStatus && (
+                <TableCell>
+                  <StatusBadge status={transaction.status} />
+                </TableCell>
+              )}
               {visibleFields.map((field) => (
                 <TableCell key={field.code} className={field.renderer.classes}>
                   {renderFieldInTable(transaction, field)}
@@ -355,6 +364,7 @@ export function TransactionList({
           <TableRow>
             <TableCell></TableCell>
             {showSubmitter && <TableCell></TableCell>}
+            {showStatus && <TableCell></TableCell>}
             {visibleFields.map((field) => (
               <TableCell key={field.code} className={field.renderer.classes}>
                 {field.renderer.footerValue ? field.renderer.footerValue(transactions) : ""}
@@ -364,7 +374,11 @@ export function TransactionList({
         </TableFooter>
       </Table>
       {selectedIds.length > 0 && (
-        <BulkActionsMenu selectedIds={selectedIds} onActionComplete={() => setSelectedIds([])} />
+        <BulkActionsMenu
+          selectedIds={selectedIds}
+          canSetStatus={showStatus}
+          onActionComplete={() => setSelectedIds([])}
+        />
       )}
     </div>
   )

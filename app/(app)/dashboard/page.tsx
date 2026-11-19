@@ -3,6 +3,7 @@ import { StatsWidget } from "@/components/dashboard/stats-widget"
 import DashboardUnsortedWidget from "@/components/dashboard/unsorted-widget"
 import { WelcomeWidget } from "@/components/dashboard/welcome-widget"
 import { Separator } from "@/components/ui/separator"
+import { getActor } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { getUnsortedFiles } from "@/models/files"
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<TransactionFilters> }) {
   const filters = await searchParams
-  const user = await getCurrentUser()
+  const [user, actor] = await Promise.all([getCurrentUser(), getActor()])
   const unsortedFiles = await getUnsortedFiles(user.id)
   const settings = await getSettings(user.id)
 
@@ -29,7 +30,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       <DashboardDropZoneWidget />
 
-      <DashboardUnsortedWidget files={unsortedFiles} />
+      <DashboardUnsortedWidget files={unsortedFiles} showSubmitter={actor.effectiveRole === "accounts"} />
 
       <Separator />
 

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { isTransactionStatus, type ManualTransactionStatus } from "@/lib/transaction-status"
 import { scopeTransactionWhere } from "@/lib/visibility"
 import { Field, Prisma, Transaction } from "@/prisma/client"
 import { cache } from "react"
@@ -33,6 +34,7 @@ export type TransactionFilters = {
   categoryCode?: string
   projectCode?: string
   submittedById?: string
+  status?: string
   type?: string
   page?: number
 }
@@ -86,6 +88,10 @@ export const getTransactions = cache(
 
       if (filters.type) {
         where.type = filters.type
+      }
+
+      if (isTransactionStatus(filters.status)) {
+        where.status = filters.status
       }
 
       if (filters.ordering) {
@@ -252,8 +258,33 @@ export const deleteTransaction = async (id: string, userId: string): Promise<Tra
 }
 
 export const bulkDeleteTransactions = async (ids: string[], userId: string) => {
-  return await prisma.transaction.deleteMany({
-    where: { id: { in: ids }, userId },
+  // Sales may only delete what they submitted, so resolve the allowed rows first.
+  const where: Prisma.TransactionWhereInput = { id: { in: ids }, userId }
+  await scopeTransactionWhere(where)
+  const allowed = await prisma.transaction.findMany({ where, select: { id: true, files: true } })
+  const allowedIds = allowed.map((transaction) => transaction.id)
+  if (allowedIds.length === 0) return { count: 0 }
+
+  const result = await prisma.transaction.deleteMany({
+    where: { id: { in: allowedIds }, userId },
+  })
+
+  const fileIds = new Set(
+    allowed.flatMap((transaction) => (Array.isArray(transaction.files) ? (transaction.files as string[]) : []))
+  )
+  for (const fileId of fileIds) {
+    const stillUsed = await prisma.transaction.count({ where: { userId, files: { array_contains: [fileId] } } })
+    if (stillUsed === 0) await deleteFile(fileId, userId)
+  }
+
+  return result
+}
+
+// Callers must check the accounts role first. Exported rows are left alone: only an export batch may change them.
+export const bulkSetTransactionStatus = async (ids: string[], userId: string, status: ManualTransactionStatus) => {
+  return await prisma.transaction.updateMany({
+    where: { id: { in: ids }, userId, status: { not: "exported" } },
+    data: { status },
   })
 }
 

@@ -3,6 +3,8 @@
 import { DateRangePicker } from "@/components/forms/date-range-picker"
 import { FormSelectCategory } from "@/components/forms/select-category"
 import { FormSelectProject } from "@/components/forms/select-project"
+import { StatusFilter } from "@/components/transactions/status-filter"
+import { SubmitterFilter } from "@/components/transactions/submitter-filter"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -27,12 +29,14 @@ export function ExportTransactionsDialog({
   fields,
   categories,
   projects,
+  people,
   total,
   children,
 }: {
   fields: Field[]
   categories: Category[]
   projects: Project[]
+  people: { id: string; name: string; email: string }[]
   total: number
   children: React.ReactNode
 }) {
@@ -64,6 +68,8 @@ export function ExportTransactionsDialog({
         ordering: exportFilters?.ordering || "",
         categoryCode: exportFilters?.categoryCode || "",
         projectCode: exportFilters?.projectCode || "",
+        submittedById: exportFilters?.submittedById || "",
+        status: exportFilters?.status || "",
         fields: exportFields.join(","),
         includeAttachments: includeAttachments.toString(),
         progressId: progressId || "",
@@ -110,6 +116,13 @@ export function ExportTransactionsDialog({
                   })
                 }}
               />
+            </div>
+
+            <div className="flex flex-row flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">Employee:</span>
+              <SubmitterFilter people={people} />
+              <span className="text-sm font-medium">Status:</span>
+              <StatusFilter />
             </div>
 
             <div className="flex flex-row items-center gap-2">

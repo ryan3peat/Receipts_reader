@@ -2,6 +2,7 @@ import { getActor, listMembers } from "@/lib/access"
 import { ExportTransactionsDialog } from "@/components/export/transactions"
 import { UploadButton } from "@/components/files/upload-button"
 import { TransactionSearchAndFilters } from "@/components/transactions/filters"
+import { StatusFilter } from "@/components/transactions/status-filter"
 import { SubmitterFilter } from "@/components/transactions/submitter-filter"
 import { TransactionList } from "@/components/transactions/list"
 import { NewTransactionDialog } from "@/components/transactions/new"
@@ -49,7 +50,13 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         </h2>
         <div className="flex gap-2">
           {isAccounts && (
-            <ExportTransactionsDialog fields={fields} categories={categories} projects={projects} total={total}>
+            <ExportTransactionsDialog
+              fields={fields}
+              categories={categories}
+              projects={projects}
+              people={people}
+              total={total}
+            >
               <Download /> <span className="hidden md:block">Export</span>
             </ExportTransactionsDialog>
           )}
@@ -63,11 +70,21 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         <div className="min-w-0 flex-1">
           <TransactionSearchAndFilters categories={categories} projects={projects} fields={fields} />
         </div>
-        {isAccounts && <SubmitterFilter people={people} />}
+        {isAccounts && (
+          <div className="flex w-full flex-wrap gap-4 md:w-auto">
+            <SubmitterFilter people={people} />
+            <StatusFilter />
+          </div>
+        )}
       </div>
 
       <main>
-        <TransactionList transactions={transactions} fields={fields} showSubmitter={isAccounts} />
+        <TransactionList
+          transactions={transactions}
+          fields={fields}
+          showSubmitter={isAccounts}
+          showStatus={isAccounts}
+        />
 
         {total > TRANSACTIONS_PER_PAGE && <Pagination totalItems={total} itemsPerPage={TRANSACTIONS_PER_PAGE} />}
 

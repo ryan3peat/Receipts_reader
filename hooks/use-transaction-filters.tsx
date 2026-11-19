@@ -3,7 +3,7 @@ import { format } from "date-fns"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useMemo } from "react"
 
-const filterKeys = ["search", "dateFrom", "dateTo", "ordering", "categoryCode", "projectCode", "submittedById"]
+const filterKeys = ["search", "dateFrom", "dateTo", "ordering", "categoryCode", "projectCode", "submittedById", "status"]
 
 export function areSearchParamsEqual(a: URLSearchParams, b: URLSearchParams) {
   const keys = new Set([...a.keys(), ...b.keys()])
@@ -103,6 +103,12 @@ export function filtersToSearchParams(
     searchParams.set("submittedById", filters.submittedById)
   } else {
     searchParams.delete("submittedById")
+  }
+
+  if (filters.status) {
+    searchParams.set("status", filters.status)
+  } else {
+    searchParams.delete("status")
   }
 
   return searchParams
