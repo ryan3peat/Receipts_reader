@@ -22,7 +22,12 @@ export const FormSelectCategory = ({
   isRequired?: boolean
 } & SelectProps) => {
   const items = useMemo(
-    () => categories.map((category) => ({ code: category.code, name: category.name, color: category.color })),
+    () =>
+      categories.map((category) => ({
+        code: category.code,
+        name: `${category.code} ${category.name}`,
+        color: category.color,
+      })),
     [categories]
   )
   return (

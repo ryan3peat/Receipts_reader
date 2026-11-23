@@ -38,10 +38,14 @@ model User {
   businessAddress     String?       @map("business_address")
   businessBankDetails String?       @map("business_bank_details")
   businessLogo        String?       @map("business_logo")
+  employeeCode        String?       @map("employee_code")
+  cardNumber          String?       @map("card_number")
   accounts            Account[]
   sessions            Session[]
   appData             AppData[]
   progress            Progress[]
+  ownedStatements     CardStatement[] @relation("StatementOwner")
+  cardStatements      CardStatement[] @relation("StatementEmployee")
 
   @@map("users")
 }
@@ -208,6 +212,7 @@ model Transaction {
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
   text                  String?
+  statementLines        CardStatementLine[]
 
   @@index([userId])
   @@index([submittedById])
@@ -241,6 +246,43 @@ model AppData {
 
   @@unique([userId, app])
   @@map("app_data")
+}
+
+model CardStatement {
+  id            String              @id @default(uuid()) @db.Uuid
+  userId        String              @map("user_id") @db.Uuid
+  user          User                @relation("StatementOwner", fields: [userId], references: [id], onDelete: Cascade)
+  employeeId    String              @map("employee_id") @db.Uuid
+  employee      User                @relation("StatementEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  fileId        String?             @map("file_id") @db.Uuid
+  filename      String
+  accountName   String?             @map("account_name")
+  accountNumber String?             @map("account_number")
+  periodLabel   String?             @map("period_label")
+  notifiedAt    DateTime?           @map("notified_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  lines         CardStatementLine[]
+
+  @@index([userId])
+  @@index([employeeId])
+  @@map("card_statements")
+}
+
+model CardStatementLine {
+  id            String         @id @default(uuid()) @db.Uuid
+  statementId   String         @map("statement_id") @db.Uuid
+  statement     CardStatement  @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  postedOn      DateTime?      @map("posted_on")
+  narrative     String
+  amount        Int
+  kind          String
+  transactionId String?        @map("transaction_id") @db.Uuid
+  transaction   Transaction?   @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  @@index([statementId])
+  @@index([transactionId])
+  @@map("card_statement_lines")
 }
 
 model Progress {

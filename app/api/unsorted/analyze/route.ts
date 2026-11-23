@@ -94,7 +94,11 @@ export async function POST(request: NextRequest) {
     projects
   )
 
-  const schema = fieldsToJsonSchema(fields)
+  const promptedFields = fields.map((field) => ({
+    ...field,
+    llm_prompt: field.llm_prompt ? buildLLMPrompt(field.llm_prompt, fields, categories, projects) : field.llm_prompt,
+  }))
+  const schema = fieldsToJsonSchema(promptedFields)
 
   const results = await analyzeTransaction(prompt, schema, attachments, file.id, user.id)
 

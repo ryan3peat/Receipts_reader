@@ -64,10 +64,16 @@ async function keepOwnedCodes(userId: string, result: Record<string, string>) {
     const value = result[key]
     if (!value) continue
     const match = { userId, OR: [{ code: value }, { name: { equals: value, mode: "insensitive" as const } }] }
-    const row =
+    let row =
       model === "category"
         ? await prisma.category.findFirst({ where: match })
         : await prisma.project.findFirst({ where: match })
+    if (!row && model === "category") {
+      const prefix = value.split(/[-\s]/)[0]
+      if (prefix && prefix !== value) {
+        row = await prisma.category.findFirst({ where: { userId, code: prefix } })
+      }
+    }
     if (row) result[key] = row.code
     else delete result[key]
   }

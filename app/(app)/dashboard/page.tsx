@@ -1,3 +1,4 @@
+import { MissingReceipts } from "@/components/dashboard/missing-receipts"
 import DashboardDropZoneWidget from "@/components/dashboard/drop-zone-widget"
 import { StatsWidget } from "@/components/dashboard/stats-widget"
 import DashboardUnsortedWidget from "@/components/dashboard/unsorted-widget"
@@ -7,6 +8,7 @@ import { getActor } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { getUnsortedFiles } from "@/models/files"
+import { latestMissingForEmployee } from "@/models/statements"
 import { getSettings } from "@/models/settings"
 import { TransactionFilters } from "@/models/transactions"
 import { Loader2 } from "lucide-react"
@@ -21,11 +23,16 @@ export const metadata: Metadata = {
 export default async function Dashboard({ searchParams }: { searchParams: Promise<TransactionFilters> }) {
   const filters = await searchParams
   const [user, actor] = await Promise.all([getCurrentUser(), getActor()])
-  const unsortedFiles = await getUnsortedFiles(user.id)
-  const settings = await getSettings(user.id)
+  const showOwnMissing = actor.effectiveRole === "sales" || actor.user.id !== actor.companyUser.id
+  const [unsortedFiles, settings, missing] = await Promise.all([
+    getUnsortedFiles(user.id),
+    getSettings(user.id),
+    showOwnMissing ? latestMissingForEmployee(user.id, actor.user.id) : Promise.resolve([]),
+  ])
 
   return (
     <div className="flex flex-col gap-5 p-5 w-full max-w-7xl self-center">
+      <MissingReceipts lines={missing} />
       {settings.is_welcome_message_hidden !== "true" && <WelcomeWidget />}
 
       <DashboardDropZoneWidget />

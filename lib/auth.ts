@@ -1,14 +1,12 @@
 import config from "@/lib/config"
-import { getSelfHostedUser, getUserByEmail, SELF_HOSTED_USER } from "@/models/users"
+import { getSelfHostedUser, SELF_HOSTED_USER } from "@/models/users"
 import { User } from "@/prisma/client"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
 import { APIError } from "better-auth/api"
 import { nextCookies } from "better-auth/next-js"
-import { emailOTP } from "better-auth/plugins/email-otp"
 import { headers } from "next/headers"
 import { prisma } from "./db"
-import { resend, sendOTPCodeEmail } from "./email"
 
 export type UserProfile = {
   id: string
@@ -31,10 +29,9 @@ export const auth = betterAuth({
   appName: config.app.title,
   baseURL: config.app.baseURL,
   secret: config.auth.secret,
-  email: {
-    provider: "resend",
-    from: config.email.from,
-    resend,
+  emailAndPassword: {
+    enabled: config.auth.devLogin !== null,
+    disableSignUp: true,
   },
   session: {
     strategy: "jwt",
@@ -84,18 +81,6 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    emailOTP({
-      disableSignUp: config.auth.disableSignup,
-      otpLength: 6,
-      expiresIn: 10 * 60, // 10 minutes
-      sendVerificationOTP: async ({ email, otp }) => {
-        const user = await getUserByEmail(email)
-        if (!user) {
-          throw new APIError("NOT_FOUND", { message: "User with this email does not exist" })
-        }
-        await sendOTPCodeEmail({ email, otp })
-      },
-    }),
     nextCookies(), // make sure this is the last plugin in the array
   ],
 })

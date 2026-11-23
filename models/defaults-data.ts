@@ -1,20 +1,21 @@
-export const DEFAULT_PROMPT_ANALYSE_NEW_FILE = `You are an accountant and invoice analysis assistant. Extract following information from the given invoice:
+export const DEFAULT_PROMPT_ANALYSE_NEW_FILE = `You are an accountant for Essential. Read the receipt and extract:
 
 {fields}
 
-Also try to extract "items": all separate products or items from the invoice
+Also extract "items": each separate product or charge that has its own name and amount.
 
-Where categories are:
+GL codes. categoryCode must be exactly one of these codes:
 
 {categories}
 
-And projects are:
+Projects:
 
 {projects}
 
-IMPORTANT RULES:
-- Do not include any other text in your response!
-- If you can't find something leave it blank, NEVER make up information
+RULES:
+- categoryCode must be one of the GL codes above. Never invent a code, and do not add a department suffix.
+- GST is Australian. vat is the GST amount in the receipt currency. vat_rate is 10 when GST is charged and 0 when the receipt is GST-free.
+- If you cannot find a value, leave it blank. Never make up a merchant, date, amount, or GL code.
 - Return only one object`
 
 export const DEFAULT_SETTINGS = [
@@ -22,13 +23,13 @@ export const DEFAULT_SETTINGS = [
     code: "default_currency",
     name: "Default Currency",
     description: "Don't change this setting if you already have multi-currency transactions. I won't recalculate them.",
-    value: "EUR",
+    value: "AUD",
   },
   {
     code: "default_category",
     name: "Default Category",
     description: "",
-    value: "other",
+    value: "",
   },
   {
     code: "default_project",
@@ -62,48 +63,7 @@ export const DEFAULT_SETTINGS = [
   },
 ]
 
-export const DEFAULT_CATEGORIES = [
-  {
-    code: "ads",
-    name: "Advertisement",
-    color: "#882727",
-    llm_prompt: "ads, promos, online ads, etc",
-  },
-  {
-    code: "swag",
-    name: "Swag and Goods",
-    color: "#882727",
-    llm_prompt: "swag, stickers, goods, etc",
-  },
-  { code: "donations", name: "Gifts and Donations", color: "#1e6359", llm_prompt: "donations, gifts, charity" },
-  { code: "tools", name: "Equipment and Tools", color: "#c69713", llm_prompt: "equipment, tools" },
-  { code: "events", name: "Events and Conferences", color: "#ff8b32", llm_prompt: "events, conferences" },
-  { code: "food", name: "Food and Drinks", color: "#d40e70", llm_prompt: "food, drinks, business meals" },
-  { code: "insurance", name: "Insurance", color: "#050942", llm_prompt: "insurance, health, life" },
-  { code: "invoice", name: "Invoice", color: "#064e85", llm_prompt: "custom invoice, bill" },
-  { code: "communication", name: "Mobile and Internet", color: "#0e7d86", llm_prompt: "mobile, internet, phone" },
-  { code: "office", name: "Office Supplies", color: "#59b0b9", llm_prompt: "office, supplies, stationery" },
-  { code: "online", name: "Online Services", color: "#8753fb", llm_prompt: "online services, saas, subscriptions" },
-  { code: "rental", name: "Rental", color: "#050942", llm_prompt: "rental, lease" },
-  {
-    code: "education",
-    name: "Education",
-    color: "#ee5d6c",
-    llm_prompt: "education, professional development, trainings",
-  },
-  { code: "salary", name: "Salary", color: "#ce4993", llm_prompt: "salary, wages, etc" },
-  { code: "fees", name: "Fees", color: "#6a0d83", llm_prompt: "fees, charges, penalties, etc" },
-  { code: "travel", name: "Travel Expenses", color: "#fb9062", llm_prompt: "travel, accommodation, etc" },
-  { code: "utility_bills", name: "Utility Bills", color: "#af7e2e", llm_prompt: "bills, electricity, water, etc" },
-  {
-    code: "transport",
-    name: "Transport",
-    color: "#800000",
-    llm_prompt: "transportation costs, fuel, car rental, vignettes, etc",
-  },
-  { code: "software", name: "Software", color: "#2b5a1d", llm_prompt: "software, licenses" },
-  { code: "other", name: "Other", color: "#121216", llm_prompt: "other, miscellaneous," },
-]
+export { ESSENTIAL_CATEGORIES as DEFAULT_CATEGORIES } from "@/models/gl-codes"
 
 export const DEFAULT_PROJECTS = [{ code: "personal", name: "Personal", llm_prompt: "personal", color: "#1e202b" }]
 
@@ -340,12 +300,12 @@ export const DEFAULT_FIELDS = [
   },
   {
     code: "categoryCode",
-    name: "Category",
+    name: "GL Code",
     type: "string",
-    llm_prompt: "category code, one of: {categories.code}",
+    llm_prompt: "Essential GL code. Return exactly one code from: {categories.code}",
     isVisibleInList: true,
     isVisibleInAnalysis: true,
-    isRequired: false,
+    isRequired: true,
     isExtra: false,
   },
   {
@@ -420,21 +380,21 @@ export const DEFAULT_FIELDS = [
   },
   {
     code: "vat_rate",
-    name: "VAT Rate",
+    name: "GST Rate",
     type: "number",
-    llm_prompt: "VAT rate in percentage 0-100",
+    llm_prompt: "Australian GST rate as a percent. Use 10 when GST is charged and 0 when the receipt is GST-free.",
     isVisibleInList: false,
-    isVisibleInAnalysis: false,
+    isVisibleInAnalysis: true,
     isRequired: false,
     isExtra: true,
   },
   {
     code: "vat",
-    name: "VAT Amount",
+    name: "GST Amount",
     type: "number",
-    llm_prompt: "total VAT in currency of the invoice",
+    llm_prompt: "GST amount in the receipt currency. Use 0 when the receipt is GST-free.",
     isVisibleInList: false,
-    isVisibleInAnalysis: false,
+    isVisibleInAnalysis: true,
     isRequired: false,
     isExtra: true,
   },

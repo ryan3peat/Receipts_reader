@@ -10,6 +10,7 @@ import { getCurrentUser, isSubscriptionExpired } from "@/lib/auth"
 import config from "@/lib/config"
 import { getApps } from "@/app/(app)/apps/common"
 import { getUnsortedFilesCount } from "@/models/files"
+import { ensureEssentialCatalog } from "@/models/gl-catalog"
 import type { Metadata, Viewport } from "next"
 import "../globals.css"
 import { NotificationProvider } from "./context"
@@ -28,6 +29,7 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [user, actor] = await Promise.all([getCurrentUser(), getActor()])
+  await ensureEssentialCatalog(user.id)
   const [unsortedFilesCount, apps] = await Promise.all([getUnsortedFilesCount(user.id), getApps()])
 
   const userProfile = {

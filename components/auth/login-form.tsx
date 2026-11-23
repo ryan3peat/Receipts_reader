@@ -7,55 +7,39 @@ import { authClient } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
-export function LoginForm({ defaultEmail, microsoftReady = false }: { defaultEmail?: string; microsoftReady?: boolean }) {
-  const [email, setEmail] = useState(defaultEmail || "")
-  const [otp, setOtp] = useState("")
-  const [isOtpSent, setIsOtpSent] = useState(false)
+export function LoginForm({
+  defaultEmail,
+  microsoftReady = false,
+  devEmail,
+}: {
+  defaultEmail?: string
+  microsoftReady?: boolean
+  devEmail?: string
+}) {
+  const [email, setEmail] = useState(devEmail || defaultEmail || "")
+  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleDev = async (event: React.FormEvent) => {
+    event.preventDefault()
     setIsLoading(true)
     setError(null)
-
     try {
-      const result = await authClient.emailOtp.sendVerificationOtp({
+      const result = await authClient.signIn.email({
         email,
-        type: "sign-in",
+        password,
+        callbackURL: "/dashboard",
       })
       if (result.error) {
-        setError(result.error.message || "Failed to send the code")
+        setError(result.error.message || "Developer sign-in failed")
         return
       }
-      setIsOtpSent(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send the code")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const result = await authClient.signIn.emailOtp({
-        email,
-        otp,
-      })
-      if (result.error) {
-        setError("The code is invalid or expired")
-        return
-      }
-
       router.push("/dashboard")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to verify the code")
+      setError(err instanceof Error ? err.message : "Developer sign-in failed")
     } finally {
       setIsLoading(false)
     }
@@ -84,33 +68,24 @@ export function LoginForm({ defaultEmail, microsoftReady = false }: { defaultEma
       <Button type="button" disabled={isMicrosoftLoading || isLoading} onClick={handleMicrosoft}>
         {isMicrosoftLoading ? "Opening Microsoft..." : "Sign in with Microsoft"}
       </Button>
-      <p className="text-center text-sm text-muted-foreground">or use an email code</p>
-    <form onSubmit={isOtpSent ? handleVerifyOtp : handleSendOtp} className="flex flex-col gap-4 w-full">
-      <FormInput
-        title="Email"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-        disabled={isOtpSent}
-      />
-
-      {isOtpSent && (
-        <FormInput
-          title="Check your email for the verification code"
-          type="text"
-          value={otp}
-          onChange={(e) => setOtp(e.target.value)}
-          required
-          maxLength={6}
-          pattern="[0-9]{6}"
-        />
+      {devEmail && (
+        <form onSubmit={handleDev} className="flex flex-col gap-4 w-full">
+          <p className="text-center text-sm text-muted-foreground">
+            Developer sign-in until the Microsoft redirect URI is registered
+          </p>
+          <FormInput title="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          <FormInput
+            title="Password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? "Loading..." : "Sign in"}
+          </Button>
+        </form>
       )}
-
-      <Button type="submit" disabled={isLoading}>
-        {isLoading ? "Loading..." : isOtpSent ? "Verify Code" : "Enter"}
-      </Button>
-    </form>
       {error && <FormError className="text-center">{error}</FormError>}
     </div>
   )

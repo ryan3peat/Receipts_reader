@@ -24,6 +24,7 @@ import {
   ClockArrowUp,
   Coins,
   DatabaseBackup,
+  FileSpreadsheet,
   FileText,
   FolderKanban,
   FormInput,
@@ -53,7 +54,7 @@ const settingsItems = [
   { title: "People", href: "/settings/users", icon: User },
   { title: "LLM settings", href: "/settings/llm", icon: Sparkles },
   { title: "Fields", href: "/settings/fields", icon: FormInput },
-  { title: "Categories", href: "/settings/categories", icon: Tags },
+  { title: "GL codes", href: "/settings/categories", icon: Tags },
   { title: "Projects", href: "/settings/projects", icon: FolderKanban },
   { title: "Currencies", href: "/settings/currencies", icon: Coins },
   { title: "Backup & Restore", href: "/settings/backups", icon: DatabaseBackup },
@@ -151,6 +152,17 @@ export function AppSidebar({
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItemWithHighlight>
+
+                {showSettings && (
+                  <SidebarMenuItemWithHighlight href="/sap">
+                    <SidebarMenuButton asChild>
+                      <Link href="/sap" onClick={closeMobile}>
+                        <FileSpreadsheet />
+                        <span>FOR SAP</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItemWithHighlight>
+                )}
 
                 {showSettings && (
                   <SidebarMenuItemWithHighlight href="/employees">

@@ -22,14 +22,15 @@ export default async function CategoriesSettingsPage() {
   return (
     <div className="space-y-8">
       <SettingsPageHeader
-        title="Categories"
-        description="Create categories that reflect your income and expenses. Define an LLM prompt so AI can assign the right category automatically."
+        title="GL codes"
+        description="Essential general ledger codes. The model picks one of these codes when it reads a receipt."
       />
       <CategoryDefaultForm settings={settings} categories={categories} />
       <Separator />
       <CrudTable
         items={categoriesWithActions}
         columns={[
+          { key: "code", label: "GL Code" },
           { key: "name", label: "Name", editable: true },
           { key: "llm_prompt", label: "LLM Prompt", editable: true },
           { key: "color", label: "Color", type: "color", defaultValue: randomHexColor(), editable: true },

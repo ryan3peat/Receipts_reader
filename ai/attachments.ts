@@ -13,7 +13,11 @@ export type AnalyzeAttachment = {
   base64: string
 }
 
-export const loadAttachmentsForAI = async (user: User, file: File): Promise<AnalyzeAttachment[]> => {
+export const loadAttachmentsForAI = async (
+  user: User,
+  file: File,
+  maxPages = MAX_PAGES_TO_ANALYZE
+): Promise<AnalyzeAttachment[]> => {
   const fullFilePath = await materializeFile(user, file)
   if (!fullFilePath) {
     throw new Error("File not found")
@@ -24,7 +28,7 @@ export const loadAttachmentsForAI = async (user: User, file: File): Promise<Anal
   const { contentType, previews } = await generateFilePreviews(user, fullFilePath, file.mimetype, format)
 
   return Promise.all(
-    previews.slice(0, MAX_PAGES_TO_ANALYZE).map(async (preview) => ({
+    previews.slice(0, maxPages).map(async (preview) => ({
       filename: file.filename,
       contentType: contentType,
       base64: await loadFileAsBase64(preview),

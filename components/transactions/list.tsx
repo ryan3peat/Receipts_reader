@@ -62,13 +62,14 @@ export const standardFieldRenderers: Record<string, FieldRenderer> = {
       ),
   },
   categoryCode: {
-    name: "Category",
+    name: "GL Code",
     code: "categoryCode",
     sortable: true,
     formatValue: (transaction: Transaction & { category?: Category }) =>
       transaction.categoryCode ? (
         <Badge className="whitespace-nowrap" style={{ backgroundColor: transaction.category?.color }}>
-          {transaction.category?.name || ""}
+          {transaction.categoryCode}
+          {transaction.category?.name ? ` ${transaction.category.name}` : ""}
         </Badge>
       ) : (
         "-"
