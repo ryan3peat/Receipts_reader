@@ -7,6 +7,13 @@ import sharp from "sharp"
 // Do not resolve pdf.js paths with require.resolve here: Turbopack replaces that call with a module id (a number),
 // which breaks every server action in this file at import time. Scanned statements need no standard fonts.
 
+// pdf.js loads its worker with a dynamic import that Vercel's file tracing cannot see, so the worker file is missing
+// from the deployed function. Importing it here puts it in the trace, and pdf.js uses it from globalThis.
+async function loadPdfWorker() {
+  const scope = globalThis as { pdfjsWorker?: unknown }
+  if (!scope.pdfjsWorker) scope.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs")
+}
+
 const MAX_PAGES = 150
 // A page is read as a 200 dpi picture, turned upright. Smaller or sideways pictures misread amounts.
 const RENDER_DENSITY = 200
@@ -116,6 +123,7 @@ export async function pageCountOf(bytes: Uint8Array): Promise<number> {
 // Each page is filled white first, so a blank page comes out white and is not counted as printed.
 async function renderPdfPages(pdf: PDFDocument): Promise<{ page: number; png: Buffer }[]> {
   for (const page of pdf.getPages()) page.setRotation(degrees(90))
+  await loadPdfWorker()
   const task = getDocument({ data: new Uint8Array(await pdf.save()) })
   const document = await task.promise
   const pages: { page: number; png: Buffer }[] = []
