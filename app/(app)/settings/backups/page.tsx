@@ -9,7 +9,7 @@ import { useDownload } from "@/hooks/use-download"
 import { useProgress } from "@/hooks/use-progress"
 import { Download, Loader2 } from "lucide-react"
 import { useActionState } from "react"
-import { resetFieldsAndCategoriesAction, resetLLMSettingsAction, restoreBackupAction } from "./actions"
+import { restoreBackupAction } from "./actions"
 
 function SettingsSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
@@ -52,7 +52,7 @@ export default function BackupSettingsPage() {
     <div className="space-y-8">
       <SettingsPageHeader
         title="Backup & Restore"
-        description="Download your data, restore from a backup, or reset settings to defaults."
+        description="Download your data or restore from a backup."
       />
 
       <SettingsSection
@@ -80,7 +80,7 @@ export default function BackupSettingsPage() {
 
       <SettingsSection
         title="Restore from backup"
-        description="Replace all current data with a previously downloaded archive. This action is irreversible — make a backup first."
+        description="Replace all current data with a previously downloaded archive. This action is irreversible, so make a backup first."
       >
         <Card className="flex flex-col gap-2 p-5 bg-red-50 border-red-100">
           <form action={restoreBackup}>
@@ -119,32 +119,6 @@ export default function BackupSettingsPage() {
             </ul>
           </Card>
         )}
-      </SettingsSection>
-
-      <Separator />
-
-      <SettingsSection
-        title="Reset LLM settings"
-        description="Reset the system prompt and other LLM settings to their default values. Use only if something is broken."
-      >
-        <form action={resetLLMSettingsAction}>
-          <Button variant="destructive" type="submit">
-            Reset main LLM prompt
-          </Button>
-        </form>
-      </SettingsSection>
-
-      <Separator />
-
-      <SettingsSection
-        title="Reset fields, currencies and categories"
-        description="Reset all fields, currencies, and categories to their default values. Use only if something is broken."
-      >
-        <form action={resetFieldsAndCategoriesAction}>
-          <Button variant="destructive" type="submit">
-            Reset fields, currencies and categories
-          </Button>
-        </form>
       </SettingsSection>
     </div>
   )

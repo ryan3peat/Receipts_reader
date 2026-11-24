@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const state = vi.hoisted(() => ({
-  auth: { masterAdminEmail: null as string | null },
+  auth: { masterAdminEmail: null as string | null, microsoft: null as { tenantId: string } | null },
   loginRequired: false,
   cookies: {} as Record<string, string>,
   session: null as { user: { id: string } } | null,
@@ -28,7 +28,7 @@ vi.mock("@/models/users", () => ({
   getUserById: vi.fn(async (id: string) => Object.values(state.users).find((user) => user.id === id) ?? null),
 }))
 
-import { requireMasterAdmin, resolveActor } from "@/lib/access"
+import { isLoginRequired, requireMasterAdmin, resolveActor } from "@/lib/access"
 import { ADMIN_BRIDGE_COOKIE, USER_VIEW_COOKIE } from "@/lib/access-cookies"
 import { isMasterAdminEmail, isValidMasterAdminEmail } from "@/lib/master-admin"
 
@@ -41,6 +41,7 @@ function signInAs(key: string) {
 
 beforeEach(() => {
   state.auth.masterAdminEmail = MASTER
+  state.auth.microsoft = null
   state.loginRequired = false
   state.cookies = {}
   state.session = null
@@ -113,11 +114,18 @@ describe("who counts as the Master Admin", () => {
     expect(await resolveActor()).toMatchObject({ isMaster: true, user: { id: "company" } })
   })
 
-  it("is the browser that turned Login on, which acts as the default account", async () => {
+  it("is not a browser carrying the old bridge cookie, which no longer lets anyone in", async () => {
     state.loginRequired = true
     state.cookies[ADMIN_BRIDGE_COOKIE] = "company"
 
-    expect(await resolveActor()).toMatchObject({ isMaster: true, user: { id: "company" } })
+    expect(await resolveActor()).toBeNull()
+  })
+
+  it("is not a session whose person no longer exists", async () => {
+    state.loginRequired = true
+    state.session = { user: { id: "deleted" } }
+
+    expect(await resolveActor()).toBeNull()
   })
 
   it("is nobody who is signed out once Login is on", async () => {
@@ -131,6 +139,23 @@ describe("who counts as the Master Admin", () => {
     signInAs("accounts")
 
     expect(await resolveActor()).toMatchObject({ isMaster: false })
+  })
+})
+
+describe("isLoginRequired", () => {
+  it("is always on once Microsoft sign-in is set up, even if the saved setting says off", async () => {
+    state.auth.microsoft = { tenantId: "tenant" }
+    state.loginRequired = false
+
+    expect(await isLoginRequired()).toBe(true)
+    expect(await resolveActor()).toBeNull()
+  })
+
+  it("follows the saved setting when Microsoft sign-in is not set up", async () => {
+    expect(await isLoginRequired()).toBe(false)
+
+    state.loginRequired = true
+    expect(await isLoginRequired()).toBe(true)
   })
 })
 

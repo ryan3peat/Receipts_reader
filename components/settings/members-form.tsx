@@ -14,11 +14,13 @@ export function MembersForm({
   companyUserId,
   masterAdminEmail,
   canManage,
+  selfEnrolDomain,
 }: {
   members: Member[]
   companyUserId: string
   masterAdminEmail: string | null
   canManage: boolean
+  selfEnrolDomain: string | null
 }) {
   const [state, action, pending] = useActionState(addMemberAction, null)
   const [role, setRole] = useState("sales")
@@ -67,6 +69,12 @@ export function MembersForm({
       {canManage ? (
         <form action={action} className="space-y-3 max-w-md">
           <h3 className="text-lg font-semibold">Add a person</h3>
+          {selfEnrolDomain && (
+            <p className="text-sm text-muted-foreground">
+              Only needed to give someone the Accounts role before they first sign in, or to let in an address
+              outside @{selfEnrolDomain}.
+            </p>
+          )}
           <Input name="name" placeholder="Name" required />
           <Input name="email" type="email" placeholder="Microsoft 365 email" required />
           <input type="hidden" name="role" value={role} />
@@ -80,7 +88,7 @@ export function MembersForm({
             </SelectContent>
           </Select>
           {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-          {state?.success && <p className="text-sm text-green-600">Person added. They can sign in when Login is on.</p>}
+          {state?.success && <p className="text-sm text-green-600">Person added. They can sign in with Microsoft.</p>}
           <Button type="submit" disabled={pending}>
             {pending ? "Adding..." : "Add person"}
           </Button>

@@ -76,15 +76,6 @@ export const getUserByStripeCustomerId = cache(async (customerId: string) => {
   })
 })
 
-// Called when Login is turned on, so the Master Admin can always sign in and manage everyone else.
-export async function ensureMasterAdminUser(email: string) {
-  return await prisma.user.upsert({
-    where: { email },
-    update: { role: "accounts" },
-    create: { email, name: email, role: "accounts", membershipPlan: "unlimited", emailVerified: true },
-  })
-}
-
 export function updateUser(userId: string, data: Prisma.UserUpdateInput) {
   return prisma.user.update({
     where: { id: userId },

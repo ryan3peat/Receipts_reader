@@ -1,7 +1,8 @@
-import { ADMIN_BRIDGE_COOKIE, LOGIN_COOKIE, LOGIN_SETTING, USER_VIEW_COOKIE } from "@/lib/access-cookies"
+import { LOGIN_SETTING, USER_VIEW_COOKIE } from "@/lib/access-cookies"
+import config from "@/lib/config"
 import { prisma } from "@/lib/db"
 import { isMasterAdminEmail } from "@/lib/master-admin"
-import { getSettings, updateSettings } from "@/models/settings"
+import { getSettings } from "@/models/settings"
 import { getOrCreateSelfHostedUser, getSelfHostedUser, getUserById } from "@/models/users"
 import { User } from "@/prisma/client"
 import { cookies } from "next/headers"
@@ -35,6 +36,10 @@ export const getCompanyUser = cache(async () => {
 })
 
 export const isLoginRequired = cache(async () => {
+  // Once Microsoft sign-in is set up there is no switch: sign-in is always required. It must not hang on the
+  // saved setting alone, because restoring an older backup replaces that setting and would open the app to anyone.
+  if (config.auth.microsoft) return true
+
   const company = await getCompanyUser()
   const settings = await getSettings(company.id)
   return settings[LOGIN_SETTING] === "true"
@@ -49,14 +54,11 @@ export const resolveActor = cache(async (): Promise<Actor | null> => {
   if (loginRequired) {
     const { getSession } = await import("@/lib/auth")
     const session = await getSession()
-    if (session?.user?.id) {
-      const found = await getUserById(session.user.id)
-      if (found) user = found
-    } else if (cookieStore.get(ADMIN_BRIDGE_COOKIE)?.value === companyUser.id) {
-      user = companyUser
-    } else {
-      return null
-    }
+    // A session is the only way in. Nothing else, and no session without a matching person, may fall back to
+    // the default account, which has full access.
+    const found = session?.user?.id ? await getUserById(session.user.id) : null
+    if (!found) return null
+    user = found
   }
 
   const realRole = roleOf(user)
@@ -69,8 +71,7 @@ export const resolveActor = cache(async (): Promise<Actor | null> => {
     effectiveRole: userView ? "sales" : realRole,
     loginRequired,
     userView,
-    // The default account counts as well: it is everyone while Login is off, and afterwards only the browser
-    // that turned Login on, which is the way back in if Microsoft sign-in ever fails.
+    // The default account counts as well: it is everyone while sign-in is not set up, and nobody afterwards.
     isMaster: user.id === companyUser.id || isMasterAdminEmail(user.email),
   }
 })
@@ -96,29 +97,6 @@ export async function requireMasterAdmin() {
     return { ok: false as const, error: "Only the Master Admin can do that" }
   }
   return gate
-}
-
-export async function setLoginRequired(enabled: boolean) {
-  const company = await getCompanyUser()
-  await updateSettings(company.id, LOGIN_SETTING, enabled ? "true" : "false")
-  const cookieStore = await cookies()
-  cookieStore.set(LOGIN_COOKIE, enabled ? "1" : "0", {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    secure: process.env.NODE_ENV === "production",
-  })
-  if (enabled) {
-    cookieStore.set(ADMIN_BRIDGE_COOKIE, company.id, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 180,
-    })
-  } else {
-    cookieStore.delete(ADMIN_BRIDGE_COOKIE)
-  }
 }
 
 export async function listMembers() {

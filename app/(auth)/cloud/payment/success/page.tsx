@@ -50,7 +50,7 @@ export default async function CloudPaymentSuccessPage({
           Welcome to EF Expenses, {user.name}. You can login to your account now
         </CardDescription>
         <CardContent className="w-full">
-          <LoginForm defaultEmail={user.email} />
+          <LoginForm microsoftReady={config.auth.microsoft !== null} />
         </CardContent>
       </Card>
     )

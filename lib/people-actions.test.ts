@@ -7,15 +7,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/config", () => ({ default: { auth: mocks.auth } }))
 vi.mock("@/lib/db", () => ({ prisma: { user: mocks.user } }))
-vi.mock("@/lib/access", () => ({ getActor: vi.fn(), requireMasterAdmin: vi.fn(), setLoginRequired: vi.fn() }))
-vi.mock("@/models/users", () => ({ getUserByEmail: vi.fn(), getUserById: vi.fn(), ensureMasterAdminUser: vi.fn() }))
+vi.mock("@/lib/access", () => ({ getActor: vi.fn(), requireMasterAdmin: vi.fn() }))
+vi.mock("@/models/users", () => ({ getUserByEmail: vi.fn(), getUserById: vi.fn() }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
-vi.mock("next/headers", () => ({ cookies: vi.fn() }))
 
-import { setLoginRequiredAction } from "@/app/(app)/access/actions"
 import { addMemberAction, updateMemberRoleAction } from "@/app/(app)/settings/users/actions"
-import { requireMasterAdmin, setLoginRequired } from "@/lib/access"
-import { ensureMasterAdminUser, getUserByEmail, getUserById } from "@/models/users"
+import { requireMasterAdmin } from "@/lib/access"
+import { getUserByEmail, getUserById } from "@/models/users"
 
 type Gate = Awaited<ReturnType<typeof requireMasterAdmin>>
 type Found = Awaited<ReturnType<typeof getUserById>>
@@ -129,64 +127,5 @@ describe("updateMemberRoleAction", () => {
 
     expect(result).toEqual({ success: false, error: "Keep at least one accounts user" })
     expect(mocks.user.update).not.toHaveBeenCalled()
-  })
-})
-
-describe("setLoginRequiredAction", () => {
-  it.each([true, false])("refuses anyone who is not the Master Admin (switching to %s)", async (enabled) => {
-    vi.mocked(requireMasterAdmin).mockResolvedValue(refused)
-
-    const result = await setLoginRequiredAction(enabled)
-
-    expect(result).toEqual({ success: false, error: "Only the Master Admin can do that" })
-    expect(ensureMasterAdminUser).not.toHaveBeenCalled()
-    expect(setLoginRequired).not.toHaveBeenCalled()
-  })
-
-  it("will not turn Login on until a Master Admin is configured", async () => {
-    mocks.auth.masterAdminEmail = null
-
-    const result = await setLoginRequiredAction(true)
-
-    expect(result).toEqual({ success: false, error: "Set MASTER_ADMIN_EMAIL before turning Login on" })
-    expect(setLoginRequired).not.toHaveBeenCalled()
-  })
-
-  it("will not turn Login on with a Master Admin email nobody could sign in with", async () => {
-    mocks.auth.masterAdminEmail = "master@localhost"
-
-    const result = await setLoginRequiredAction(true)
-
-    expect(result).toEqual({ success: false, error: "MASTER_ADMIN_EMAIL is not a valid email address" })
-    expect(ensureMasterAdminUser).not.toHaveBeenCalled()
-    expect(setLoginRequired).not.toHaveBeenCalled()
-  })
-
-  it("makes sure the Master Admin can sign in before turning Login on", async () => {
-    const order: string[] = []
-    vi.mocked(ensureMasterAdminUser).mockImplementation(async () => {
-      order.push("ensure")
-      return {} as Awaited<ReturnType<typeof ensureMasterAdminUser>>
-    })
-    vi.mocked(setLoginRequired).mockImplementation(async () => {
-      order.push("login")
-    })
-
-    const result = await setLoginRequiredAction(true)
-
-    expect(result).toEqual({ success: true })
-    expect(ensureMasterAdminUser).toHaveBeenCalledWith("master@ef.test")
-    expect(setLoginRequired).toHaveBeenCalledWith(true)
-    expect(order).toEqual(["ensure", "login"])
-  })
-
-  it("turns Login off without touching any account", async () => {
-    mocks.auth.masterAdminEmail = null
-
-    const result = await setLoginRequiredAction(false)
-
-    expect(result).toEqual({ success: true })
-    expect(ensureMasterAdminUser).not.toHaveBeenCalled()
-    expect(setLoginRequired).toHaveBeenCalledWith(false)
   })
 })

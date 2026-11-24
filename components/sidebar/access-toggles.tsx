@@ -1,6 +1,6 @@
 "use client"
 
-import { setLoginRequiredAction, setUserViewAction } from "@/app/(app)/access/actions"
+import { setUserViewAction } from "@/app/(app)/access/actions"
 import { cn } from "@/lib/utils"
 import { useEffect, useRef, useState } from "react"
 
@@ -41,24 +41,11 @@ function Switch({
   )
 }
 
-export function AccessToggles({
-  loginRequired,
-  userView,
-  showLogin,
-}: {
-  loginRequired: boolean
-  userView: boolean
-  showLogin: boolean
-}) {
+export function AccessToggles({ userView }: { userView: boolean }) {
   const pendingRef = useRef(false)
   const [pending, setPending] = useState(false)
-  const [loginOn, setLoginOn] = useState(loginRequired)
   const [userOn, setUserOn] = useState(userView)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    setLoginOn(loginRequired)
-  }, [loginRequired])
 
   useEffect(() => {
     setUserOn(userView)
@@ -66,28 +53,6 @@ export function AccessToggles({
 
   return (
     <div className="group-data-[collapsible=icon]:hidden">
-      {showLogin && (
-        <Switch
-          label="Login"
-          checked={loginOn}
-          disabled={pending}
-          onCheckedChange={(checked) => {
-            if (pendingRef.current) return
-            pendingRef.current = true
-            setError(null)
-            setLoginOn(checked)
-            setPending(true)
-            void setLoginRequiredAction(checked).then((result) => {
-              pendingRef.current = false
-              setPending(false)
-              if (!result.success) {
-                setLoginOn(!checked)
-                setError(result.error)
-              }
-            })
-          }}
-        />
-      )}
       <Switch
         label="User View"
         checked={userOn}

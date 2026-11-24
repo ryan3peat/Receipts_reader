@@ -3,7 +3,6 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card"
 import { ColoredText } from "@/components/ui/colored-text"
 import { isLoginRequired } from "@/lib/access"
 import config from "@/lib/config"
-import { ensureDevLogin } from "@/lib/dev-login"
 import Image from "next/image"
 import { redirect } from "next/navigation"
 
@@ -12,8 +11,6 @@ export default async function LoginPage() {
     redirect(config.selfHosted.redirectUrl)
   }
 
-  const devEmail = config.auth.devLogin ? await ensureDevLogin() : null
-
   return (
     <Card className="w-full max-w-xl mx-auto p-8 flex flex-col items-center justify-center gap-4">
       <Image src="/logo/512.png" alt="Logo" width={144} height={144} className="w-36 h-36" />
@@ -21,7 +18,7 @@ export default async function LoginPage() {
         <ColoredText>EF Expenses</ColoredText>
       </CardTitle>
       <CardContent className="w-full">
-        <LoginForm microsoftReady={config.auth.microsoft !== null} devEmail={devEmail || undefined} />
+        <LoginForm microsoftReady={config.auth.microsoft !== null} />
       </CardContent>
     </Card>
   )

@@ -67,7 +67,6 @@ export function AppSidebar({
   isSelfHosted,
   apps,
   showSettings,
-  showLoginToggle,
   showUserView,
   loginRequired,
   userView,
@@ -78,7 +77,6 @@ export function AppSidebar({
   isSelfHosted: boolean
   apps: SidebarApp[]
   showSettings: boolean
-  showLoginToggle: boolean
   showUserView: boolean
   loginRequired: boolean
   userView: boolean
@@ -243,7 +241,7 @@ export function AppSidebar({
                 )}
               </SidebarMenu>
               {showUserView && (
-                <AccessToggles loginRequired={loginRequired} userView={userView} showLogin={showLoginToggle} />
+                <AccessToggles userView={userView} />
               )}
             </SidebarGroupContent>
           </SidebarGroup>

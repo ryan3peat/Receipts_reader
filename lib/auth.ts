@@ -7,6 +7,7 @@ import { APIError } from "better-auth/api"
 import { nextCookies } from "better-auth/next-js"
 import { headers } from "next/headers"
 import { prisma } from "./db"
+import { enrolOnFirstSignIn } from "./sign-in-enrolment"
 
 export type UserProfile = {
   id: string
@@ -29,10 +30,6 @@ export const auth = betterAuth({
   appName: config.app.title,
   baseURL: config.app.baseURL,
   secret: config.auth.secret,
-  emailAndPassword: {
-    enabled: config.auth.devLogin !== null,
-    disableSignUp: true,
-  },
   session: {
     strategy: "jwt",
     expiresIn: 180 * 24 * 60 * 60, // 365 days
@@ -58,6 +55,11 @@ export const auth = betterAuth({
             prompt: "select_account",
             // The photo would be stored as a large inline image on the user and in the session cookie.
             disableProfilePhoto: true,
+            // A company person signing in for the first time gets an account before they are looked up.
+            mapProfileToUser: async (profile) => {
+              await enrolOnFirstSignIn(profile)
+              return {}
+            },
           },
         },
       }
@@ -72,6 +74,8 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        // Accounts are only ever created by enrolOnFirstSignIn or on the People page, never by the sign-in
+        // library, whose default role would be accounts. Anyone reaching this point is not a company person.
         before: async () => {
           throw new APIError("FORBIDDEN", {
             message: "This Microsoft account is not on the EF Expenses list. Ask accounts to add you.",
