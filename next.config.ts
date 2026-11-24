@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true, // FIXME: bug on prod, images always empty, investigate later
   },
-  serverExternalPackages: ["@prisma/adapter-pg", "exceljs"],
+  serverExternalPackages: ["@prisma/adapter-pg", "exceljs", "@napi-rs/canvas", "pdfjs-dist"],
   experimental: {
     serverActions: {
       bodySizeLimit: "256mb",
