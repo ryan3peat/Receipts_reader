@@ -37,7 +37,7 @@ async function attempt<T extends { success: boolean }>(call: () => Promise<T>): 
   try {
     return await call()
   } catch {
-    return { success: false, error: "The connection to the server was lost" }
+    return { success: false, error: "The server could not finish this step. Try the upload again. If it fails the same way, tell me the time so the Vercel logs can be checked." }
   }
 }
 

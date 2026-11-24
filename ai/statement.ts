@@ -1,12 +1,11 @@
 import { requestLLM, type LLMResponse, type LLMSettings } from "@/ai/providers/llmProvider"
 import { createCanvas } from "@napi-rs/canvas"
-import { createRequire } from "module"
 import { degrees, PDFDocument } from "pdf-lib"
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
 import sharp from "sharp"
 
-// Standard PDF fonts, for statements whose text is not embedded. Without them pdf.js prints a warning.
-const STANDARD_FONTS_DIR = `${createRequire(import.meta.url).resolve("pdfjs-dist/package.json").replace(/package\.json$/, "")}standard_fonts/`
+// Do not resolve pdf.js paths with require.resolve here: Turbopack replaces that call with a module id (a number),
+// which breaks every server action in this file at import time. Scanned statements need no standard fonts.
 
 const MAX_PAGES = 150
 // A page is read as a 200 dpi picture, turned upright. Smaller or sideways pictures misread amounts.
@@ -117,10 +116,7 @@ export async function pageCountOf(bytes: Uint8Array): Promise<number> {
 // Each page is filled white first, so a blank page comes out white and is not counted as printed.
 async function renderPdfPages(pdf: PDFDocument): Promise<{ page: number; png: Buffer }[]> {
   for (const page of pdf.getPages()) page.setRotation(degrees(90))
-  const task = getDocument({
-    data: new Uint8Array(await pdf.save()),
-    standardFontDataUrl: STANDARD_FONTS_DIR,
-  })
+  const task = getDocument({ data: new Uint8Array(await pdf.save()) })
   const document = await task.promise
   const pages: { page: number; png: Buffer }[] = []
   try {
