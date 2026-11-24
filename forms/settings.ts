@@ -25,8 +25,13 @@ export const settingsFormSchema = z.object({
 })
 
 export const currencyFormSchema = z.object({
-  code: z.string().max(5),
-  name: z.string().max(32),
+  code: z.string().max(5, "Code must be 5 characters or fewer"),
+  name: z.string().max(32, "Name must be 32 characters or fewer"),
+})
+
+export const currencyEditSchema = z.object({
+  code: z.string().max(5, "Code must be 5 characters or fewer").optional(),
+  name: z.string().max(32, "Name must be 32 characters or fewer"),
 })
 
 export const projectFormSchema = z.object({

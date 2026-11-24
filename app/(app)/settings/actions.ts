@@ -3,6 +3,7 @@
 import { LLMConfig, LLMProvider, testLLMProvider } from "@/ai/providers/llmProvider"
 import {
   categoryFormSchema,
+  currencyEditSchema,
   currencyFormSchema,
   fieldFormSchema,
   projectFormSchema,
@@ -29,9 +30,17 @@ async function accountsOnly() {
   return null
 }
 
+function prismaCode(error: unknown) {
+  if (typeof error !== "object" || error === null || !("code" in error)) return undefined
+  return (error as { code?: unknown }).code
+}
+
 function isMissingRecord(error: unknown): boolean {
-  if (typeof error !== "object" || error === null || !("code" in error)) return false
-  return (error as { code?: unknown }).code === "P2025"
+  return prismaCode(error) === "P2025"
+}
+
+function isDuplicateRecord(error: unknown): boolean {
+  return prismaCode(error) === "P2002"
 }
 
 function ownedWriteError(verb: "update" | "delete", record: string, error: unknown) {
@@ -167,17 +176,26 @@ export async function editCurrencyAction(code: string, data: Prisma.CurrencyUpda
   const denied = await accountsOnly()
   if (denied) return denied
   const user = await getCurrentUser()
-  const validatedForm = currencyFormSchema.safeParse(data)
+  const validatedForm = currencyEditSchema.safeParse(data)
 
   if (!validatedForm.success) {
-    return { success: false, error: validatedForm.error.message }
+    return { success: false, error: validatedForm.error.issues[0]?.message ?? "Invalid currency" }
   }
 
+  const submittedCode = validatedForm.data.code?.trim().toUpperCase()
+  const nextCode = submittedCode && submittedCode !== code ? submittedCode : undefined
+
   try {
-    const currency = await updateCurrency(user.id, code, { name: validatedForm.data.name })
+    const currency = await updateCurrency(user.id, code, {
+      name: validatedForm.data.name,
+      ...(nextCode ? { code: nextCode } : {}),
+    })
     revalidatePath("/settings/currencies")
     return { success: true, currency }
   } catch (error) {
+    if (isDuplicateRecord(error)) {
+      return { success: false, error: `A currency with the code "${nextCode ?? code}" already exists` }
+    }
     return ownedWriteError("update", "currency", error)
   }
 }
