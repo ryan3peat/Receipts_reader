@@ -30,6 +30,7 @@ import {
   FormInput,
   House,
   Import,
+  LogOut,
   Sparkles,
   Tags,
   Upload,
@@ -70,6 +71,7 @@ export function AppSidebar({
   showUserView,
   loginRequired,
   userView,
+  signedInAs,
 }: {
   profile: UserProfile
   unsortedFilesCount: number
@@ -80,6 +82,7 @@ export function AppSidebar({
   showUserView: boolean
   loginRequired: boolean
   userView: boolean
+  signedInAs?: string
 }) {
   const { open, setOpenMobile } = useSidebar()
   const pathname = usePathname()
@@ -244,6 +247,28 @@ export function AppSidebar({
               )}
             </SidebarGroupContent>
           </SidebarGroup>
+          {loginRequired && (
+            <SidebarGroup>
+              <SidebarGroupContent>
+                {signedInAs && (
+                  <p className="truncate px-2 pb-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                    Signed in as {signedInAs}
+                  </p>
+                )}
+                {/* A plain form post, so logging out works even if the page scripts have not loaded. */}
+                <form action="/sign-out" method="post">
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton type="submit" tooltip="Log out">
+                        <LogOut />
+                        <span>Log out</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </form>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
           {!isSelfHosted && (
             <SidebarGroup>
               <SidebarGroupContent>

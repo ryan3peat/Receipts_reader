@@ -57,6 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             showUserView={actor.realRole === "accounts"}
             loginRequired={actor.loginRequired}
             userView={actor.userView}
+            signedInAs={actor.loginRequired ? actor.user.email : undefined}
             apps={apps.map((app) => ({
               id: app.id,
               name: app.manifest.name,
