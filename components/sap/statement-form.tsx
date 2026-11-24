@@ -8,7 +8,6 @@ import {
 } from "@/app/(app)/sap/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatCurrency } from "@/lib/utils"
 import { useState, type FormEvent } from "react"
 
@@ -33,8 +32,6 @@ type Phase =
 
 export function StatementForm({ employees }: { employees: SapEmployee[] }) {
   const [phase, setPhase] = useState<Phase>({ step: "idle" })
-  const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? "")
-
   if (employees.length === 0) {
     return <p className="text-sm text-muted-foreground">Add an employee before uploading a statement.</p>
   }
@@ -163,28 +160,6 @@ export function StatementForm({ employees }: { employees: SapEmployee[] }) {
           </p>
         </div>
       )}
-
-      <form action="/sap/receipts" method="get" className="space-y-3 max-w-xl">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Employee
-          <Select value={employeeId} onValueChange={setEmployeeId}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {employees.map((employee) => (
-                <SelectItem key={employee.id} value={employee.id}>
-                  {employee.name || employee.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <input type="hidden" name="employeeId" value={employeeId} />
-        <Button type="submit" variant="outline">
-          Download Reconciliations from receipts only
-        </Button>
-      </form>
     </div>
   )
 }

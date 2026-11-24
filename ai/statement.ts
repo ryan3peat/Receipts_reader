@@ -1,10 +1,12 @@
 import { requestLLM, type LLMResponse, type LLMSettings } from "@/ai/providers/llmProvider"
-import { mkdtemp, rm, writeFile } from "fs/promises"
-import os from "os"
-import path from "path"
+import { createCanvas } from "@napi-rs/canvas"
+import { createRequire } from "module"
 import { degrees, PDFDocument } from "pdf-lib"
-import { fromPath } from "pdf2pic"
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
 import sharp from "sharp"
+
+// Standard PDF fonts, for statements whose text is not embedded. Without them pdf.js prints a warning.
+const STANDARD_FONTS_DIR = `${createRequire(import.meta.url).resolve("pdfjs-dist/package.json").replace(/package\.json$/, "")}standard_fonts/`
 
 const MAX_PAGES = 150
 // A page is read as a 200 dpi picture, turned upright. Smaller or sideways pictures misread amounts.
@@ -112,26 +114,37 @@ async function pageCountOf(bytes: Uint8Array): Promise<number> {
 }
 
 // Renders every page of a PDF as an upright picture. The pages are turned before rendering.
+// Each page is filled white first, so a blank page comes out white and is not counted as printed.
 async function renderPdfPages(pdf: PDFDocument): Promise<{ page: number; png: Buffer }[]> {
   for (const page of pdf.getPages()) page.setRotation(degrees(90))
-  const workDir = await mkdtemp(path.join(os.tmpdir(), "ef-statement-"))
+  const task = getDocument({
+    data: new Uint8Array(await pdf.save()),
+    standardFontDataUrl: STANDARD_FONTS_DIR,
+  })
+  const document = await task.promise
+  const pages: { page: number; png: Buffer }[] = []
   try {
-    const uprightPath = path.join(workDir, "statement.pdf")
-    await writeFile(uprightPath, await pdf.save())
-    const convert = fromPath(uprightPath, {
-      density: RENDER_DENSITY,
-      format: "png",
-      width: RENDER_SIZE,
-      height: RENDER_SIZE,
-      preserveAspectRatio: true,
-    })
-    const results = await convert.bulk(-1, { responseType: "buffer" })
-    return results
-      .flatMap((result) => (result.buffer && result.page ? [{ page: result.page, png: result.buffer }] : []))
-      .sort((left, right) => left.page - right.page)
+    for (let number = 1; number <= document.numPages; number++) {
+      const page = await document.getPage(number)
+      try {
+        const natural = page.getViewport({ scale: 1 })
+        const scale = Math.min(RENDER_DENSITY / 72, RENDER_SIZE / natural.width, RENDER_SIZE / natural.height)
+        const viewport = page.getViewport({ scale })
+        const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
+        await page.render({
+          canvas: canvas as unknown as HTMLCanvasElement,
+          viewport,
+          background: "#ffffff",
+        }).promise
+        pages.push({ page: number, png: await canvas.encode("png") })
+      } finally {
+        page.cleanup()
+      }
+    }
   } finally {
-    await rm(workDir, { recursive: true, force: true })
+    await task.destroy()
   }
+  return pages
 }
 
 // Every page of the statement as an upright picture, numbered from 1.
