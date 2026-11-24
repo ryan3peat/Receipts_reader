@@ -182,7 +182,7 @@ export function StatementForm({ employees }: { employees: SapEmployee[] }) {
         </label>
         <input type="hidden" name="employeeId" value={employeeId} />
         <Button type="submit" variant="outline">
-          Download FOR SAP from receipts only
+          Download Reconciliations from receipts only
         </Button>
       </form>
     </div>

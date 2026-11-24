@@ -16,6 +16,6 @@ export const MissingReceiptsEmail: React.FC<{
         </li>
       ))}
     </ul>
-    <p>Upload the receipt for each one so accounts can finish the FOR SAP sheet.</p>
+    <p>Upload the receipt for each one so accounts can finish the Reconciliations sheet.</p>
   </EmailLayout>
 )
