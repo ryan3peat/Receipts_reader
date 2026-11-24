@@ -5,7 +5,13 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true, // FIXME: bug on prod, images always empty, investigate later
   },
-  serverExternalPackages: ["@prisma/adapter-pg", "exceljs"],
+  // mupdf reads its wasm file from disk by its own path, so it must not be bundled.
+  serverExternalPackages: ["@prisma/adapter-pg", "exceljs", "mupdf"],
+  // Vercel only deploys files it can trace. The wasm file is opened by path, so trace it explicitly for statement routes.
+  outputFileTracingIncludes: {
+    "/sap": ["./node_modules/mupdf/dist/mupdf-wasm.wasm"],
+    "/sap/**": ["./node_modules/mupdf/dist/mupdf-wasm.wasm"],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "256mb",
