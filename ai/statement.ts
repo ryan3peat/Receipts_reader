@@ -1,18 +1,7 @@
 import { requestLLM, type LLMResponse, type LLMSettings } from "@/ai/providers/llmProvider"
-import { createCanvas } from "@napi-rs/canvas"
 import { degrees, PDFDocument } from "pdf-lib"
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
+import * as mupdf from "mupdf"
 import sharp from "sharp"
-
-// Do not resolve pdf.js paths with require.resolve here: Turbopack replaces that call with a module id (a number),
-// which breaks every server action in this file at import time. Scanned statements need no standard fonts.
-
-// pdf.js loads its worker with a dynamic import that Vercel's file tracing cannot see, so the worker file is missing
-// from the deployed function. Importing it here puts it in the trace, and pdf.js uses it from globalThis.
-async function loadPdfWorker() {
-  const scope = globalThis as { pdfjsWorker?: unknown }
-  if (!scope.pdfjsWorker) scope.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs")
-}
 
 const MAX_PAGES = 150
 // A page is read as a 200 dpi picture, turned upright. Smaller or sideways pictures misread amounts.
@@ -121,32 +110,31 @@ export async function pageCountOf(bytes: Uint8Array): Promise<number> {
 
 // Renders every page of a PDF as an upright picture. The pages are turned before rendering.
 // Each page is filled white first, so a blank page comes out white and is not counted as printed.
+// mupdf renders the faint scans legibly. pdf.js rendered the same pages with the text nearly gone.
 async function renderPdfPages(pdf: PDFDocument): Promise<{ page: number; png: Buffer }[]> {
   for (const page of pdf.getPages()) page.setRotation(degrees(90))
-  await loadPdfWorker()
-  const task = getDocument({ data: new Uint8Array(await pdf.save()) })
-  const document = await task.promise
+  const document = mupdf.Document.openDocument(new Uint8Array(await pdf.save()), "application/pdf") as mupdf.PDFDocument
   const pages: { page: number; png: Buffer }[] = []
   try {
-    for (let number = 1; number <= document.numPages; number++) {
-      const page = await document.getPage(number)
+    for (let index = 0; index < document.countPages(); index++) {
+      const page = document.loadPage(index)
       try {
-        const natural = page.getViewport({ scale: 1 })
-        const scale = Math.min(RENDER_DENSITY / 72, RENDER_SIZE / natural.width, RENDER_SIZE / natural.height)
-        const viewport = page.getViewport({ scale })
-        const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
-        await page.render({
-          canvas: canvas as unknown as HTMLCanvasElement,
-          viewport,
-          background: "#ffffff",
-        }).promise
-        pages.push({ page: number, png: await canvas.encode("png") })
+        const [x0, y0, x1, y1] = page.getBounds()
+        const width = x1 - x0
+        const height = y1 - y0
+        const scale = Math.min(RENDER_DENSITY / 72, RENDER_SIZE / width, RENDER_SIZE / height)
+        const pixmap = page.toPixmap(mupdf.Matrix.scale(scale, scale), mupdf.ColorSpace.DeviceRGB, false, true)
+        try {
+          pages.push({ page: index + 1, png: Buffer.from(pixmap.asPNG()) })
+        } finally {
+          pixmap.destroy()
+        }
       } finally {
-        page.cleanup()
+        page.destroy()
       }
     }
   } finally {
-    await task.destroy()
+    document.destroy()
   }
   return pages
 }
