@@ -1,7 +1,8 @@
 import { PDFDocument, StandardFonts } from "pdf-lib"
 import sharp from "sharp"
 import { describe, expect, it } from "vitest"
-import { printedPages, renderOnePage, renderStatementPages } from "@/ai/statement"
+import { pageCountOf, printedPages, readOnePage, renderOnePage, renderStatementPages } from "@/ai/statement"
+import type { LLMSettings } from "@/ai/providers/llmProvider"
 
 async function statementPdf(pages: { text?: string; width?: number; height?: number }[]): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
@@ -39,6 +40,17 @@ describe("statement rendering", () => {
     const pages = await renderStatementPages(bytes)
     const printed = await printedPages(pages)
     expect(printed.map((page) => page.page)).toEqual([1, 3])
+  })
+
+  it("counts pages without rendering them", async () => {
+    expect(await pageCountOf(await statementPdf([{ text: "a" }, {}, { text: "b" }]))).toBe(3)
+  })
+
+  it("skips a blank page without calling the model", async () => {
+    const bytes = await statementPdf([{ text: "Card transactions" }, {}])
+    // A blank page never reaches the model, so no settings are needed.
+    const result = await readOnePage({} as LLMSettings, bytes, 2, "statement.pdf")
+    expect(result).toEqual({ blank: true })
   })
 
   it("rejects a PDF that cannot be opened", async () => {
