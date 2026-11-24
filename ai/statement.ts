@@ -100,7 +100,7 @@ export const STATEMENT_SCHEMA = {
   required: ["pages"],
 }
 
-async function pageCountOf(bytes: Uint8Array): Promise<number> {
+export async function pageCountOf(bytes: Uint8Array): Promise<number> {
   let source: PDFDocument
   try {
     source = await PDFDocument.load(bytes)
@@ -169,15 +169,18 @@ export async function renderOnePage(bytes: Uint8Array, page: number): Promise<Bu
   return pages[0].png
 }
 
+// Whether a page picture has any print on it.
+export async function isPrinted(png: Buffer): Promise<boolean> {
+  const { data } = await sharp(png).greyscale().raw().toBuffer({ resolveWithObject: true })
+  let dark = 0
+  for (const value of data) if (value < 200) dark++
+  return dark / data.length >= INK_SHARE
+}
+
 // Drops blank pages, so no request is spent on them.
 export async function printedPages(pages: { page: number; png: Buffer }[]): Promise<{ page: number; png: Buffer }[]> {
   const printed: { page: number; png: Buffer }[] = []
-  for (const item of pages) {
-    const { data } = await sharp(item.png).greyscale().raw().toBuffer({ resolveWithObject: true })
-    let dark = 0
-    for (const value of data) if (value < 200) dark++
-    if (dark / data.length >= INK_SHARE) printed.push(item)
-  }
+  for (const item of pages) if (await isPrinted(item.png)) printed.push(item)
   return printed
 }
 
@@ -222,7 +225,14 @@ export async function readPicture(llm: LLMSettings, page: number, png: Buffer, f
   throw new Error(`Page ${page} of the statement could not be read. ${failure}`)
 }
 
-// Renders one page of the stored statement and reads it.
-export async function readOnePage(llm: LLMSettings, bytes: Uint8Array, page: number, filename: string): Promise<unknown[]> {
-  return readPicture(llm, page, await renderOnePage(bytes, page), filename)
+// Renders one page of the stored statement. A blank page is skipped without a model call, otherwise it is read.
+export async function readOnePage(
+  llm: LLMSettings,
+  bytes: Uint8Array,
+  page: number,
+  filename: string
+): Promise<{ blank: true } | { blank: false; entries: unknown[] }> {
+  const png = await renderOnePage(bytes, page)
+  if (!(await isPrinted(png))) return { blank: true }
+  return { blank: false, entries: await readPicture(llm, page, png, filename) }
 }

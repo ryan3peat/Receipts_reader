@@ -2,10 +2,14 @@
 
 import {
   finishStatementAction,
+  planStatementAction,
   readStatementPageAction,
+  saveStatementCardAction,
   startStatementAction,
+  type StatementHolder,
   type StatementImportResult,
 } from "@/app/(app)/sap/actions"
+import { UploadProgress, type Progress } from "@/components/sap/upload-progress"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { formatCurrency } from "@/lib/utils"
@@ -24,11 +28,18 @@ const ATTEMPTS_PER_PAGE = 3
 
 type Phase =
   | { step: "idle" }
-  | { step: "preparing" }
-  | { step: "reading"; done: number; total: number; page: number }
-  | { step: "finishing" }
+  | { step: "working"; progress: Progress }
   | { step: "done"; result: StatementImportResult }
   | { step: "failed"; error: string }
+
+// A dropped connection rejects instead of returning, so it is turned into an ordinary failure.
+async function attempt<T extends { success: boolean }>(call: () => Promise<T>): Promise<T | { success: false; error: string }> {
+  try {
+    return await call()
+  } catch {
+    return { success: false, error: "The connection to the server was lost" }
+  }
+}
 
 export function StatementForm({ employees }: { employees: SapEmployee[] }) {
   const [phase, setPhase] = useState<Phase>({ step: "idle" })
@@ -36,38 +47,94 @@ export function StatementForm({ employees }: { employees: SapEmployee[] }) {
     return <p className="text-sm text-muted-foreground">Add an employee before uploading a statement.</p>
   }
 
-  const busy = phase.step === "preparing" || phase.step === "reading" || phase.step === "finishing"
+  const busy = phase.step === "working"
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
-    setPhase({ step: "preparing" })
+    const runStart = Date.now()
+    const fail = (error: string) => setPhase({ step: "failed", error })
 
-    const started = await startStatementAction(formData)
-    if (!started.success) return setPhase({ step: "failed", error: started.error })
+    // 1. Upload
+    setPhase({ step: "working", progress: { stage: "uploading", runStart, stageStart: runStart } })
+    const started = await attempt(() => startStatementAction(formData))
+    if (!started.success) return fail(started.error)
+    const { fileId, pageCount } = started
+    const uploadMs = Date.now() - runStart
 
-    const pages = started.printedPages
-    for (let index = 0; index < pages.length; index++) {
-      const page = pages[index]
-      setPhase({ step: "reading", done: index, total: pages.length, page })
+    // 2. Break out and read each page
+    const readStart = Date.now()
+    const modelMs: number[] = []
+    let blank = 0
+    for (let page = 1; page <= pageCount; page++) {
+      const pageStart = Date.now()
       let error = ""
-      let read = false
-      for (let attempt = 0; attempt < ATTEMPTS_PER_PAGE && !read; attempt++) {
-        const result = await readStatementPageAction(started.fileId, page)
-        if (result.success) read = true
+      let outcome: { blank: boolean } | null = null
+      for (let tries = 1; tries <= ATTEMPTS_PER_PAGE && !outcome; tries++) {
+        setPhase({
+          step: "working",
+          progress: {
+            stage: "reading",
+            runStart,
+            stageStart: readStart,
+            uploadMs,
+            pageCount,
+            page,
+            done: page - 1,
+            blank,
+            attempt: tries,
+            attempts: ATTEMPTS_PER_PAGE,
+            pageStart: Date.now(),
+            modelMs: [...modelMs],
+            lastError: error || undefined,
+          },
+        })
+        const result = await attempt(() => readStatementPageAction(fileId, page))
+        if (result.success) outcome = result
         else error = result.error
       }
-      if (!read) {
-        return setPhase({ step: "failed", error: `Page ${page} could not be read after ${ATTEMPTS_PER_PAGE} tries. ${error}` })
+      if (!outcome) return fail(`Page ${page} of ${pageCount} could not be read after ${ATTEMPTS_PER_PAGE} tries. ${error}`)
+      if (outcome.blank) blank++
+      else modelMs.push(Date.now() - pageStart)
+    }
+    const readMs = Date.now() - readStart
+
+    // 3. Create one statement per card
+    const plan = await attempt(() => planStatementAction(fileId))
+    if (!plan.success) return fail(plan.error)
+
+    const saveStart = Date.now()
+    const holders: StatementHolder[] = []
+    for (let index = 0; index < plan.cards.length; index++) {
+      const card = plan.cards[index]
+      setPhase({
+        step: "working",
+        progress: {
+          stage: "saving",
+          runStart,
+          stageStart: saveStart,
+          uploadMs,
+          readMs,
+          pageCount,
+          blank,
+          done: index,
+          total: plan.cards.length,
+          current: `${card.name}${card.card ? `, card ${card.card}` : ""}, ${card.lines} transactions`,
+        },
+      })
+      const saved = await attempt(() => saveStatementCardAction(fileId, card.index))
+      if (!saved.success) {
+        const savedNote = index > 0 ? ` ${index} of ${plan.cards.length} statements were saved.` : ""
+        return fail(`Could not create the statement for ${card.name}. ${saved.error}.${savedNote} Upload the PDF again to retry, saved statements are replaced, not doubled.`)
       }
+      holders.push(saved.holder)
     }
 
-    setPhase({ step: "finishing" })
-    const result = await finishStatementAction(started.fileId)
-    setPhase(result.success ? { step: "done", result } : { step: "failed", error: result.error ?? "Could not save the statement" })
+    await attempt(() => finishStatementAction())
+    setPhase({ step: "done", result: { holders, unmatched: plan.unmatched, checks: plan.checks } })
   }
 
-  const flagged = phase.step === "done" ? phase.result.checks?.filter((check) => check.ok === false) ?? [] : []
+  const flagged = phase.step === "done" ? phase.result.checks.filter((check) => check.ok === false) : []
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -81,28 +148,15 @@ export function StatementForm({ employees }: { employees: SapEmployee[] }) {
           person by card number, then by name, and saved against them.
         </p>
         <Button type="submit" disabled={busy}>
-          {busy ? "Reading statement..." : "Read statement and find missing receipts"}
+          {busy ? "Working..." : "Read statement and find missing receipts"}
         </Button>
       </form>
 
-      {phase.step === "preparing" && <p className="text-sm text-muted-foreground">Preparing the statement pages...</p>}
-
-      {phase.step === "reading" && (
-        <div className="space-y-2 text-sm">
-          <p>
-            Reading page {phase.page} ({phase.done + 1} of {phase.total})
-          </p>
-          <div className="h-2 w-full overflow-hidden rounded bg-muted">
-            <div className="h-2 bg-primary transition-all" style={{ width: `${(phase.done / phase.total) * 100}%` }} />
-          </div>
-        </div>
-      )}
-
-      {phase.step === "finishing" && <p className="text-sm text-muted-foreground">Matching cards to people and saving...</p>}
+      {phase.step === "working" && <UploadProgress progress={phase.progress} />}
 
       {phase.step === "failed" && <p className="text-sm text-red-600">{phase.error}</p>}
 
-      {phase.step === "done" && phase.result.success && (
+      {phase.step === "done" && (
         <div className="space-y-3 text-sm">
           <div className="rounded-md border">
             <table className="w-full text-left">
@@ -115,7 +169,7 @@ export function StatementForm({ employees }: { employees: SapEmployee[] }) {
                 </tr>
               </thead>
               <tbody>
-                {phase.result.holders?.map((holder, index) => (
+                {phase.result.holders.map((holder, index) => (
                   <tr key={`${holder.card}-${index}`} className="border-t">
                     <td className="p-2">{holder.name}</td>
                     <td className="p-2">{holder.card || "-"}</td>
@@ -127,7 +181,7 @@ export function StatementForm({ employees }: { employees: SapEmployee[] }) {
             </table>
           </div>
 
-          {phase.result.unmatched && phase.result.unmatched.length > 0 && (
+          {phase.result.unmatched.length > 0 && (
             <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-yellow-950">
               <p className="font-medium">No person found for these cards, so nothing was saved for them:</p>
               <ul className="mt-1 list-disc pl-5">

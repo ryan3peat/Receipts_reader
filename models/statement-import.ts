@@ -1,12 +1,5 @@
-import {
-  checkStatement,
-  matchCardholder,
-  matchStatementLines,
-  type Cardholder,
-  type CombinedStatement,
-  type HolderCheck,
-  type StatementPurchase,
-} from "@/lib/sap"
+import { matchStatementLines, type Cardholder, type CombinedStatement, type HolderCheck, type ParsedCardSection, type StatementPurchase } from "@/lib/sap"
+import { planSave } from "@/lib/statement-state"
 import { receiptsForEmployee, saveCardStatement } from "@/models/statements"
 
 export type ImportedHolder = {
@@ -27,8 +20,55 @@ export type StatementImport = {
   checks: HolderCheck[]
 }
 
-// Saves one statement per card in a combined PDF, against the person the card belongs to, and works out which
-// purchases have no receipt yet. The billing account has no owner, so it is only used to check the totals.
+// Saves one card's statement against the person it belongs to, and works out which purchases have no receipt yet.
+// Saving the same card and period again replaces it, so a retry is safe.
+export async function saveCardSection(input: {
+  ownerId: string
+  fileId: string
+  filename: string
+  section: ParsedCardSection
+  person: Cardholder
+}): Promise<ImportedHolder> {
+  const { section, person } = input
+  const receipts = await receiptsForEmployee(input.ownerId, person.id)
+  const purchases: StatementPurchase[] = section.lines.map((line, index) => ({
+    id: String(index),
+    postedOn: line.postedOn,
+    narrative: line.narrative,
+    amountCents: line.amountCents,
+    kind: line.kind,
+  }))
+  const matches = matchStatementLines(purchases, receipts)
+  await saveCardStatement({
+    userId: input.ownerId,
+    employeeId: person.id,
+    fileId: input.fileId,
+    filename: input.filename,
+    accountName: section.accountName,
+    accountNumber: section.accountNumber,
+    periodLabel: section.periodLabel,
+    lines: section.lines.map((line, index) => ({ ...line, transactionId: matches[index]?.receipt?.id ?? null })),
+  })
+
+  return {
+    employeeId: person.id,
+    employeeName: person.name,
+    accountName: section.accountName,
+    accountNumber: section.accountNumber,
+    periodLabel: section.periodLabel,
+    lineCount: section.lines.length,
+    purchaseCount: section.lines.filter((line) => line.kind === "purchase").length,
+    missing: matches
+      .filter((match) => match.line.kind === "purchase" && !match.receipt)
+      .map((match) => ({
+        postedOn: match.line.postedOn,
+        narrative: match.line.narrative,
+        amountCents: match.line.amountCents,
+      })),
+  }
+}
+
+// Saves one statement per card in a combined PDF. The billing account has no owner, so it is only used to check the totals.
 export async function saveCombinedStatement(input: {
   ownerId: string
   fileId: string
@@ -36,58 +76,18 @@ export async function saveCombinedStatement(input: {
   combined: CombinedStatement
   people: Cardholder[]
 }): Promise<StatementImport> {
+  const plan = planSave(input.combined, input.people)
   const imported: ImportedHolder[] = []
-  const unmatched: StatementImport["unmatched"] = []
-
-  for (const section of input.combined.sections) {
-    if (section.billing || section.lines.length === 0) continue
-    const person = matchCardholder(section, input.people)
-    if (!person) {
-      unmatched.push({
-        accountName: section.accountName,
-        accountNumber: section.accountNumber,
-        lineCount: section.lines.length,
+  for (const target of plan.targets) {
+    imported.push(
+      await saveCardSection({
+        ownerId: input.ownerId,
+        fileId: input.fileId,
+        filename: input.filename,
+        section: target.section,
+        person: target.person,
       })
-      continue
-    }
-
-    const receipts = await receiptsForEmployee(input.ownerId, person.id)
-    const purchases: StatementPurchase[] = section.lines.map((line, index) => ({
-      id: String(index),
-      postedOn: line.postedOn,
-      narrative: line.narrative,
-      amountCents: line.amountCents,
-      kind: line.kind,
-    }))
-    const matches = matchStatementLines(purchases, receipts)
-    await saveCardStatement({
-      userId: input.ownerId,
-      employeeId: person.id,
-      fileId: input.fileId,
-      filename: input.filename,
-      accountName: section.accountName,
-      accountNumber: section.accountNumber,
-      periodLabel: section.periodLabel,
-      lines: section.lines.map((line, index) => ({ ...line, transactionId: matches[index]?.receipt?.id ?? null })),
-    })
-
-    imported.push({
-      employeeId: person.id,
-      employeeName: person.name,
-      accountName: section.accountName,
-      accountNumber: section.accountNumber,
-      periodLabel: section.periodLabel,
-      lineCount: section.lines.length,
-      purchaseCount: section.lines.filter((line) => line.kind === "purchase").length,
-      missing: matches
-        .filter((match) => match.line.kind === "purchase" && !match.receipt)
-        .map((match) => ({
-          postedOn: match.line.postedOn,
-          narrative: match.line.narrative,
-          amountCents: match.line.amountCents,
-        })),
-    })
+    )
   }
-
-  return { imported, unmatched, checks: checkStatement(input.combined) }
+  return { imported, unmatched: plan.unmatched, checks: plan.checks }
 }
