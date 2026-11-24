@@ -159,7 +159,7 @@ export function AppSidebar({
                     <SidebarMenuButton asChild>
                       <Link href="/sap" onClick={closeMobile}>
                         <FileSpreadsheet />
-                        <span>FOR SAP</span>
+                        <span>Reconciliations</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItemWithHighlight>
