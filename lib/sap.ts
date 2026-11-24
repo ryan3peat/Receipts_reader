@@ -148,6 +148,339 @@ export function parseStatementOutput(output: Record<string, unknown>): ParsedSta
   }
 }
 
+// A combined statement: one PDF from the bank that covers every cardholder of the company.
+
+export type ParsedCardSection = {
+  accountName: string
+  accountNumber: string
+  periodLabel: string
+  billing: boolean
+  pages: number[]
+  // "Total for this period" as printed. Negative when the bank prints CR.
+  statedTotalCents: number | null
+  lines: ParsedStatementLine[]
+}
+
+// One row of the bank's own "Cardholder summary" table.
+export type BankSummaryRow = {
+  accountNumber: string
+  accountName: string
+  creditsCents: number
+  purchasesCents: number
+  chargesCents: number
+}
+
+export type CombinedStatement = {
+  sections: ParsedCardSection[]
+  summary: BankSummaryRow[]
+}
+
+export function cardDigits(value: string | null | undefined): string {
+  return (value || "").replace(/\D/g, "")
+}
+
+export function formatCardNumber(value: string | null | undefined): string {
+  const digits = cardDigits(value)
+  if (digits.length !== 16) return (value || "").trim()
+  return digits.replace(/(\d{4})(?=\d)/g, "$1-")
+}
+
+const TITLES = new Set(["MR", "MRS", "MS", "MISS", "MX", "DR"])
+
+// "MS TERRI ANNE MARTIN (continued)" and "Terri Anne Martin" are the same holder.
+export function holderKey(name: string | null | undefined): string {
+  return (name || "")
+    .toUpperCase()
+    .replace(/\(CONTINUED\)/g, " ")
+    .replace(/[^A-Z0-9' -]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token && !TITLES.has(token))
+    .join(" ")
+}
+
+// Reads "$3,920.30CR" as -392030 and "$337.54" as 33754. Null when there is no amount.
+export function parseMoney(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? Math.round(value * 100) : null
+  if (typeof value !== "string") return null
+  const digits = value.replace(/[^0-9.]/g, "")
+  if (!/\d/.test(digits)) return null
+  const amount = Number.parseFloat(digits)
+  if (!Number.isFinite(amount)) return null
+  const credit = /CR/i.test(value) || /^\s*-/.test(value)
+  return Math.round(amount * 100) * (credit ? -1 : 1)
+}
+
+// The bank marks money coming back with CR, so the direction is known and only the type is worked out here.
+export function classifyCardLine(narrative: string, credit: boolean): LineKind {
+  const text = narrative.toLowerCase()
+  if (credit) {
+    return /payment|top ?up|direct debit/.test(text) ? "payment" : "refund"
+  }
+  if (/card fee|tran fee|transaction fee|interest charge|late payment fee/.test(text)) return "fee"
+  return "purchase"
+}
+
+function str(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function cleanHolderName(value: unknown): string {
+  return str(value)
+    .replace(/\(continued\)/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function cardLines(raw: unknown): ParsedStatementLine[] {
+  const rows = Array.isArray(raw) ? raw : []
+  const lines: Array<ParsedStatementLine & { foreign: boolean }> = []
+  for (const item of rows) {
+    if (!item || typeof item !== "object") continue
+    const row = item as Record<string, unknown>
+    const narrative = str(row.narrative).replace(/\s+/g, " ")
+    if (!narrative) continue
+
+    // The bank repeats a foreign purchase on a second row that only shows the foreign amount.
+    const repeated = narrative.match(/^FRGN AMT:?\s*(.*)$/i)
+    if (repeated) {
+      const previous = lines[lines.length - 1]
+      if (previous && !previous.foreign && repeated[1]) {
+        previous.narrative = `${previous.narrative} (${repeated[1]})`
+        previous.foreign = true
+      }
+      continue
+    }
+
+    const amount = typeof row.amount === "number" ? row.amount : Number.parseFloat(String(row.amount ?? ""))
+    if (!Number.isFinite(amount) || amount === 0) continue
+    const credit = row.credit === true || amount < 0
+    const foreign = str(row.foreign).replace(/^FRGN AMT:?\s*/i, "")
+    lines.push({
+      postedOn: asDay(row.date),
+      narrative: foreign ? `${narrative} (${foreign})` : narrative,
+      amountCents: Math.round(Math.abs(amount) * 100),
+      kind: classifyCardLine(narrative, credit),
+      foreign: Boolean(foreign),
+    })
+  }
+  return lines.map((line) => ({
+    postedOn: line.postedOn,
+    narrative: line.narrative,
+    amountCents: line.amountCents,
+    kind: line.kind,
+  }))
+}
+
+function summaryRows(raw: unknown): BankSummaryRow[] {
+  const rows = Array.isArray(raw) ? raw : []
+  return rows.flatMap((item) => {
+    if (!item || typeof item !== "object") return []
+    const row = item as Record<string, unknown>
+    const accountNumber = str(row.accountNumber)
+    if (cardDigits(accountNumber).length < 12) return []
+    return [
+      {
+        accountNumber: formatCardNumber(accountNumber),
+        accountName: cleanHolderName(row.cardholderName),
+        creditsCents: Math.abs(parseMoney(row.credits) ?? 0),
+        purchasesCents: Math.abs(parseMoney(row.purchases) ?? 0),
+        chargesCents: Math.abs(parseMoney(row.charges) ?? 0),
+      },
+    ]
+  })
+}
+
+// Joins the pages the model read, in any order, into one section per card.
+// A card always starts on a page that prints its number; the pages after it only repeat the holder's name.
+export function assembleStatement(rawPages: unknown[]): CombinedStatement {
+  const pages = rawPages
+    .flatMap((item) => {
+      if (!item || typeof item !== "object") return []
+      const page = item as Record<string, unknown>
+      const number = typeof page.page === "number" ? page.page : Number.parseInt(String(page.page ?? ""), 10)
+      return Number.isFinite(number) ? [{ ...page, page: number }] : []
+    })
+    .sort((left, right) => left.page - right.page)
+
+  const sections: ParsedCardSection[] = []
+  const summary: BankSummaryRow[] = []
+
+  for (const page of pages as Array<Record<string, unknown> & { page: number }>) {
+    const kind = str(page.kind).toLowerCase()
+
+    for (const row of summaryRows(page.summary)) {
+      if (!summary.some((known) => cardDigits(known.accountNumber) === cardDigits(row.accountNumber))) summary.push(row)
+    }
+    if (kind === "summary") continue
+
+    const lines = cardLines(page.lines)
+    const name = cleanHolderName(page.cardholderName)
+    const billing = kind === "billing" || /^billing account/i.test(name)
+    if (!billing && kind !== "cardholder" && lines.length === 0) continue
+
+    const digits = cardDigits(str(page.accountNumber))
+    const holders = sections.filter((section) => !section.billing)
+    let section: ParsedCardSection | undefined
+    if (billing) {
+      section = sections.find((known) => known.billing)
+    } else if (digits.length >= 12) {
+      section = holders.find((known) => cardDigits(known.accountNumber) === digits)
+    } else {
+      const key = holderKey(name)
+      section =
+        (key ? [...holders].reverse().find((known) => holderKey(known.accountName) === key) : undefined) ??
+        holders[holders.length - 1]
+    }
+    if (!section) {
+      section = {
+        accountName: billing ? "Billing account" : name,
+        accountNumber: digits.length >= 12 ? formatCardNumber(digits) : "",
+        periodLabel: "",
+        billing,
+        pages: [],
+        statedTotalCents: null,
+        lines: [],
+      }
+      sections.push(section)
+    }
+
+    section.pages.push(page.page)
+    section.lines.push(...lines)
+    if (!section.accountName && name) section.accountName = name
+    if (!section.periodLabel) section.periodLabel = str(page.period)
+    const stated = parseMoney(page.totalForPeriod)
+    if (stated !== null) section.statedTotalCents = stated
+  }
+
+  return { sections, summary }
+}
+
+export function sectionTotals(lines: ParsedStatementLine[]) {
+  let purchasesCents = 0
+  let creditsCents = 0
+  let feesCents = 0
+  for (const line of lines) {
+    if (line.kind === "purchase") purchasesCents += line.amountCents
+    else if (line.kind === "fee") feesCents += line.amountCents
+    else creditsCents += line.amountCents
+  }
+  return { purchasesCents, creditsCents, feesCents, netCents: purchasesCents + feesCents - creditsCents }
+}
+
+export type HolderCheck = {
+  key: string
+  name: string
+  cards: string[]
+  billing: boolean
+  lineCount: number
+  purchasesCents: number
+  creditsCents: number
+  feesCents: number
+  // The bank's own figures for this holder, when the statement includes its summary table.
+  bank: { purchasesCents: number; creditsCents: number; chargesCents: number } | null
+  // Whether each card's lines add up to its printed "Total for this period".
+  totalsAgree: boolean | null
+  // The bank's summary table disagrees with the lines. Shown as a note only.
+  summaryDiffers: boolean
+  // True when the lines agree with the total printed on the cardholder's pages, null when no total was printed.
+  ok: boolean | null
+}
+
+// Checks what was read against the totals the bank printed, one result per holder.
+// A lost card and its replacement are one line in the bank's summary, so cards are grouped by holder.
+export function checkStatement(statement: CombinedStatement): HolderCheck[] {
+  const groups = new Map<string, ParsedCardSection[]>()
+  for (const section of statement.sections) {
+    const key = section.billing ? "BILLING ACCOUNT" : holderKey(section.accountName) || section.accountNumber
+    groups.set(key, [...(groups.get(key) ?? []), section])
+  }
+
+  const claimed = new Set<BankSummaryRow>()
+  const byCard = new Map<string, BankSummaryRow[]>()
+  for (const [key, sections] of groups) {
+    const cards = new Set(sections.map((section) => cardDigits(section.accountNumber)).filter(Boolean))
+    const rows = statement.summary.filter((row) => cards.has(cardDigits(row.accountNumber)))
+    rows.forEach((row) => claimed.add(row))
+    byCard.set(key, rows)
+  }
+
+  return [...groups].map(([key, sections]) => {
+    let rows = byCard.get(key) ?? []
+    if (rows.length === 0) {
+      // The summary cuts long names short, and the billing account prints no number on its own pages.
+      rows = statement.summary.filter((row) => {
+        if (claimed.has(row)) return false
+        const rowKey = holderKey(row.accountName)
+        if (rowKey.length < 6) return false
+        return key.startsWith(rowKey) || rowKey.startsWith(key)
+      })
+      rows.forEach((row) => claimed.add(row))
+    }
+
+    const lines = sections.flatMap((section) => section.lines)
+    const totals = sectionTotals(lines)
+    const stated = sections.filter((section) => section.statedTotalCents !== null)
+    const totalsAgree =
+      stated.length === 0
+        ? null
+        : stated.every((section) => sectionTotals(section.lines).netCents === section.statedTotalCents)
+    const bank =
+      rows.length === 0
+        ? null
+        : {
+            purchasesCents: rows.reduce((sum, row) => sum + row.purchasesCents, 0),
+            creditsCents: rows.reduce((sum, row) => sum + row.creditsCents, 0),
+            chargesCents: rows.reduce((sum, row) => sum + row.chargesCents, 0),
+          }
+    const bankAgrees =
+      bank === null
+        ? null
+        : bank.purchasesCents === totals.purchasesCents &&
+          bank.creditsCents === totals.creditsCents &&
+          bank.chargesCents === totals.feesCents
+    // The total printed on the cardholder's own pages is the authority. The summary table is read separately,
+    // and a difference there is only noted, so a misread summary row cannot flag correct transactions.
+    const ok = totalsAgree !== null ? totalsAgree : bankAgrees
+
+    return {
+      summaryDiffers: bankAgrees === false,
+      key,
+      name: sections[0].accountName,
+      cards: sections.map((section) => section.accountNumber).filter(Boolean),
+      billing: sections[0].billing,
+      lineCount: lines.length,
+      purchasesCents: totals.purchasesCents,
+      creditsCents: totals.creditsCents,
+      feesCents: totals.feesCents,
+      bank,
+      totalsAgree,
+      ok,
+    }
+  })
+}
+
+export type Cardholder = { id: string; name: string; cardNumber: string | null }
+
+// Finds the person a card belongs to: by card number first, then by first and last name.
+export function matchCardholder(
+  section: { accountName: string; accountNumber: string },
+  people: Cardholder[]
+): Cardholder | null {
+  const digits = cardDigits(section.accountNumber)
+  if (digits.length >= 12) {
+    const byCard = people.filter((person) => cardDigits(person.cardNumber) === digits)
+    if (byCard.length === 1) return byCard[0]
+  }
+  const tokens = new Set(holderKey(section.accountName).split(" ").filter(Boolean))
+  if (tokens.size < 2) return null
+  const byName = people.filter((person) => {
+    const parts = holderKey(person.name).split(" ").filter(Boolean)
+    if (parts.length < 2) return false
+    return tokens.has(parts[0]) && tokens.has(parts[parts.length - 1])
+  })
+  return byName.length === 1 ? byName[0] : null
+}
+
 function daysApart(a: string | null, b: string | null) {
   if (!a || !b) return 99
   const left = Date.parse(`${a}T00:00:00.000Z`)

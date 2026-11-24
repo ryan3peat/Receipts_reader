@@ -27,12 +27,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const [unsortedFiles, settings, missing] = await Promise.all([
     getUnsortedFiles(user.id),
     getSettings(user.id),
-    showOwnMissing ? latestMissingForEmployee(user.id, actor.user.id) : Promise.resolve([]),
+    showOwnMissing
+      ? latestMissingForEmployee(user.id, actor.user.id)
+      : Promise.resolve({ periodLabel: null, lines: [] }),
   ])
 
   return (
     <div className="flex flex-col gap-5 p-5 w-full max-w-7xl self-center">
-      <MissingReceipts lines={missing} />
+      <MissingReceipts lines={missing.lines} periodLabel={missing.periodLabel} />
       {settings.is_welcome_message_hidden !== "true" && <WelcomeWidget />}
 
       <DashboardDropZoneWidget />

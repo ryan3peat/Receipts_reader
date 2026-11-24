@@ -93,25 +93,40 @@ export async function saveCardStatement(input: {
   periodLabel: string
   lines: Array<ParsedStatementLine & { transactionId: string | null }>
 }) {
-  return prisma.cardStatement.create({
-    data: {
-      userId: input.userId,
-      employeeId: input.employeeId,
-      fileId: input.fileId,
-      filename: input.filename,
-      accountName: input.accountName,
-      accountNumber: input.accountNumber,
-      periodLabel: input.periodLabel,
-      lines: {
-        create: input.lines.map((line) => ({
-          postedOn: line.postedOn ? new Date(`${line.postedOn}T00:00:00.000Z`) : null,
-          narrative: line.narrative,
-          amount: line.amountCents,
-          kind: line.kind,
-          transactionId: line.transactionId,
-        })),
+  return prisma.$transaction(async (tx) => {
+    // Uploading the same card and period again replaces the earlier copy instead of doubling the lines.
+    if (input.accountNumber && input.periodLabel) {
+      await tx.cardStatement.deleteMany({
+        where: {
+          userId: input.userId,
+          employeeId: input.employeeId,
+          accountNumber: input.accountNumber,
+          periodLabel: input.periodLabel,
+        },
+      })
+    }
+    return tx.cardStatement.create({
+      data: {
+        userId: input.userId,
+        employeeId: input.employeeId,
+        fileId: input.fileId,
+        filename: input.filename,
+        accountName: input.accountName,
+        accountNumber: input.accountNumber,
+        periodLabel: input.periodLabel,
+        lines: {
+          createMany: {
+            data: input.lines.map((line) => ({
+              postedOn: line.postedOn ? new Date(`${line.postedOn}T00:00:00.000Z`) : null,
+              narrative: line.narrative,
+              amount: line.amountCents,
+              kind: line.kind,
+              transactionId: line.transactionId,
+            })),
+          },
+        },
       },
-    },
+    })
   })
 }
 
@@ -124,14 +139,19 @@ export async function rematchStatement(statementId: string, userId: string) {
   const receipts = await receiptsForEmployee(userId, statement.employeeId)
   const purchases = purchasesFromLines(statement.lines)
   const matches = matchStatementLines(purchases, receipts)
-  await prisma.$transaction(
-    matches.map((match) =>
-      prisma.cardStatementLine.update({
-        where: { id: match.line.id },
-        data: { transactionId: match.line.kind === "purchase" ? match.receipt?.id ?? null : null },
-      })
+  const current = new Map(statement.lines.map((line) => [line.id, line.transactionId]))
+  // Only the lines whose receipt changed are written, so opening a page does not rewrite a whole statement.
+  const changed = matches.flatMap((match) => {
+    const transactionId = match.line.kind === "purchase" ? match.receipt?.id ?? null : null
+    return current.get(match.line.id) === transactionId ? [] : [{ id: match.line.id, transactionId }]
+  })
+  if (changed.length > 0) {
+    await prisma.$transaction(
+      changed.map((line) =>
+        prisma.cardStatementLine.update({ where: { id: line.id }, data: { transactionId: line.transactionId } })
+      )
     )
-  )
+  }
   return prisma.cardStatement.findFirst({
     where: { id: statementId, userId },
     include: {
@@ -173,13 +193,27 @@ export async function listStatements(userId: string) {
   })
 }
 
+// The purchases on a person's latest statement that still have no receipt.
+// A lost card and its replacement arrive in the same upload as two statements, so both are included.
 export async function latestMissingForEmployee(userId: string, employeeId: string) {
   const latest = await prisma.cardStatement.findFirst({
     where: { userId, employeeId },
     orderBy: { createdAt: "desc" },
   })
-  if (!latest) return []
-  const statement = await rematchStatement(latest.id, userId)
-  if (!statement) return []
-  return statement.lines.filter((line) => line.kind === "purchase" && !line.transactionId)
+  if (!latest) return { periodLabel: null, lines: [] }
+  const sameUpload = latest.fileId
+    ? await prisma.cardStatement.findMany({
+        where: { userId, employeeId, fileId: latest.fileId },
+        select: { id: true },
+      })
+    : [{ id: latest.id }]
+  const found = []
+  for (const statement of sameUpload) {
+    const matched = await rematchStatement(statement.id, userId)
+    if (matched) found.push(...matched.lines)
+  }
+  const lines = found
+    .filter((line) => line.kind === "purchase" && !line.transactionId)
+    .sort((left, right) => (left.postedOn?.getTime() ?? 0) - (right.postedOn?.getTime() ?? 0))
+  return { periodLabel: latest.periodLabel, lines }
 }

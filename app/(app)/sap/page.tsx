@@ -10,6 +10,9 @@ import { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
+// The statement upload runs on this page, and reading a long scanned statement takes a few minutes.
+export const maxDuration = 300
+
 export const metadata: Metadata = {
   title: "FOR SAP",
   description: "Build the FOR SAP sheet and find card transactions with no receipt",
