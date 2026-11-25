@@ -10,6 +10,7 @@ import { FormSelectProject } from "@/components/forms/select-project"
 import { FormSelectType } from "@/components/forms/select-type"
 import { FormInput, FormTextarea } from "@/components/forms/simple"
 import { Button } from "@/components/ui/button"
+import { isFieldShownInForm } from "@/lib/field-validation"
 import { TransactionData } from "@/models/transactions"
 import { Category, Currency, Field, Project, Transaction } from "@/prisma/client"
 import { Loader2, Save, Trash2 } from "lucide-react"
@@ -95,19 +96,27 @@ export default function TransactionEditForm({
         isRequired={fieldMap.name.isRequired}
       />
 
-      <FormInput
-        title={fieldMap.merchant.name}
-        name="merchant"
-        defaultValue={formData.merchant}
-        isRequired={fieldMap.merchant.isRequired}
-      />
+      {isFieldShownInForm(fieldMap.merchant) ? (
+        <FormInput
+          title={fieldMap.merchant.name}
+          name="merchant"
+          defaultValue={formData.merchant}
+          isRequired={fieldMap.merchant.isRequired}
+        />
+      ) : (
+        <input type="hidden" name="merchant" value={formData.merchant} />
+      )}
 
-      <FormInput
-        title={fieldMap.description.name}
-        name="description"
-        defaultValue={formData.description}
-        isRequired={fieldMap.description.isRequired}
-      />
+      {isFieldShownInForm(fieldMap.description) ? (
+        <FormInput
+          title={fieldMap.description.name}
+          name="description"
+          defaultValue={formData.description}
+          isRequired={fieldMap.description.isRequired}
+        />
+      ) : (
+        <input type="hidden" name="description" value={formData.description} />
+      )}
 
       <div className="flex flex-row gap-4">
         <FormInput
@@ -120,36 +129,48 @@ export default function TransactionEditForm({
           isRequired={fieldMap.total.isRequired}
         />
 
-        <FormSelectCurrency
-          title={fieldMap.currencyCode.name}
-          name="currencyCode"
-          value={formData.currencyCode}
-          onValueChange={(value) => {
-            setFormData({ ...formData, currencyCode: value })
-          }}
-          currencies={currencies}
-          isRequired={fieldMap.currencyCode.isRequired}
-        />
+        {isFieldShownInForm(fieldMap.currencyCode) ? (
+          <FormSelectCurrency
+            title={fieldMap.currencyCode.name}
+            name="currencyCode"
+            value={formData.currencyCode}
+            onValueChange={(value) => {
+              setFormData({ ...formData, currencyCode: value })
+            }}
+            currencies={currencies}
+            isRequired={fieldMap.currencyCode.isRequired}
+          />
+        ) : (
+          <input type="hidden" name="currencyCode" value={formData.currencyCode} />
+        )}
 
-        <FormSelectType
-          title={fieldMap.type.name}
-          name="type"
-          defaultValue={formData.type}
-          isRequired={fieldMap.type.isRequired}
-        />
+        {isFieldShownInForm(fieldMap.type) ? (
+          <FormSelectType
+            title={fieldMap.type.name}
+            name="type"
+            defaultValue={formData.type}
+            isRequired={fieldMap.type.isRequired}
+          />
+        ) : (
+          <input type="hidden" name="type" value={formData.type} />
+        )}
       </div>
 
       <div className="flex flex-row flex-grow gap-4">
-        <FormInput
-          title={fieldMap.issuedAt.name}
-          type="date"
-          name="issuedAt"
-          defaultValue={formData.issuedAt}
-          isRequired={fieldMap.issuedAt.isRequired}
-        />
+        {isFieldShownInForm(fieldMap.issuedAt) ? (
+          <FormInput
+            title={fieldMap.issuedAt.name}
+            type="date"
+            name="issuedAt"
+            defaultValue={formData.issuedAt}
+            isRequired={fieldMap.issuedAt.isRequired}
+          />
+        ) : (
+          <input type="hidden" name="issuedAt" value={formData.issuedAt} />
+        )}
         {formData.currencyCode !== settings.default_currency || formData.convertedTotal !== 0 ? (
           <>
-            {formData.convertedTotal !== null && (
+            {formData.convertedTotal !== null && isFieldShownInForm(fieldMap.convertedTotal) && (
               <FormInput
                 title={`Total converted to ${formData.convertedCurrencyCode || "UNKNOWN CURRENCY"}`}
                 type="number"
@@ -160,15 +181,25 @@ export default function TransactionEditForm({
                 className="max-w-36"
               />
             )}
-            {(!formData.convertedCurrencyCode || formData.convertedCurrencyCode !== settings.default_currency) && (
-              <FormSelectCurrency
-                title="Convert to"
-                name="convertedCurrencyCode"
-                defaultValue={formData.convertedCurrencyCode || settings.default_currency}
-                currencies={currencies}
-                isRequired={fieldMap.convertedCurrencyCode.isRequired}
-              />
+            {formData.convertedTotal !== null && !isFieldShownInForm(fieldMap.convertedTotal) && (
+              <input type="hidden" name="convertedTotal" value={formData.convertedTotal.toFixed(2)} />
             )}
+            {(!formData.convertedCurrencyCode || formData.convertedCurrencyCode !== settings.default_currency) &&
+              (isFieldShownInForm(fieldMap.convertedCurrencyCode) ? (
+                <FormSelectCurrency
+                  title="Convert to"
+                  name="convertedCurrencyCode"
+                  defaultValue={formData.convertedCurrencyCode || settings.default_currency}
+                  currencies={currencies}
+                  isRequired={fieldMap.convertedCurrencyCode.isRequired}
+                />
+              ) : (
+                <input
+                  type="hidden"
+                  name="convertedCurrencyCode"
+                  value={formData.convertedCurrencyCode || settings.default_currency}
+                />
+              ))}
           </>
         ) : (
           <></>
@@ -176,43 +207,64 @@ export default function TransactionEditForm({
       </div>
 
       <div className="flex flex-row gap-4">
-        <FormSelectCategory
-          title={fieldMap.categoryCode.name}
-          categories={categories}
-          name="categoryCode"
-          defaultValue={formData.categoryCode}
-          isRequired={fieldMap.categoryCode.isRequired}
-        />
+        {isFieldShownInForm(fieldMap.categoryCode) ? (
+          <FormSelectCategory
+            title={fieldMap.categoryCode.name}
+            categories={categories}
+            name="categoryCode"
+            defaultValue={formData.categoryCode}
+            isRequired={fieldMap.categoryCode.isRequired}
+          />
+        ) : (
+          <input type="hidden" name="categoryCode" value={formData.categoryCode || ""} />
+        )}
 
-        <FormSelectProject
-          title={fieldMap.projectCode.name}
-          projects={projects}
-          name="projectCode"
-          defaultValue={formData.projectCode}
-          isRequired={fieldMap.projectCode.isRequired}
-        />
+        {isFieldShownInForm(fieldMap.projectCode) ? (
+          <FormSelectProject
+            title={fieldMap.projectCode.name}
+            projects={projects}
+            name="projectCode"
+            defaultValue={formData.projectCode}
+            isRequired={fieldMap.projectCode.isRequired}
+          />
+        ) : (
+          <input type="hidden" name="projectCode" value={formData.projectCode || ""} />
+        )}
       </div>
 
-      <FormTextarea
-        title={fieldMap.note.name}
-        name="note"
-        defaultValue={formData.note}
-        className="h-24"
-        isRequired={fieldMap.note.isRequired}
-      />
+      {isFieldShownInForm(fieldMap.note) ? (
+        <FormTextarea
+          title={fieldMap.note.name}
+          name="note"
+          defaultValue={formData.note}
+          className="h-24"
+          isRequired={fieldMap.note.isRequired}
+        />
+      ) : (
+        <input type="hidden" name="note" value={formData.note} />
+      )}
 
       <div className="flex flex-wrap gap-4">
-        {extraFields.map((field) => (
-          <FormInput
-            key={field.code}
-            type="text"
-            title={field.name}
-            name={field.code}
-            defaultValue={(formData[field.code as keyof typeof formData] as string) || ""}
-            isRequired={field.isRequired}
-            className={field.type === "number" ? "max-w-36" : "max-w-full"}
-          />
-        ))}
+        {extraFields.map((field) =>
+          isFieldShownInForm(field) ? (
+            <FormInput
+              key={field.code}
+              type="text"
+              title={field.name}
+              name={field.code}
+              defaultValue={(formData[field.code as keyof typeof formData] as string) || ""}
+              isRequired={field.isRequired}
+              className={field.type === "number" ? "max-w-36" : "max-w-full"}
+            />
+          ) : (
+            <input
+              key={field.code}
+              type="hidden"
+              name={field.code}
+              value={(formData[field.code as keyof typeof formData] as string) || ""}
+            />
+          )
+        )}
       </div>
 
       {formData.items && Array.isArray(formData.items) && formData.items.length > 0 && (

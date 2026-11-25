@@ -20,8 +20,9 @@ type FormInputProps = InputHTMLAttributes<HTMLInputElement> & {
   isRequired?: boolean
 }
 
-export function FormInput({ title, hideIfEmpty = false, isRequired = false, ...props }: FormInputProps) {
+export function FormInput({ title, hideIfEmpty = false, isRequired = false, required, ...props }: FormInputProps) {
   const isEmpty = (!props.defaultValue || props.defaultValue.toString().trim() === "") && !props.value
+  const mustFill = Boolean(isRequired || required)
 
   if (hideIfEmpty && isEmpty) {
     return null
@@ -33,7 +34,8 @@ export function FormInput({ title, hideIfEmpty = false, isRequired = false, ...p
       <Input
         {...props}
         id={props.id || (props as { name?: string }).name}
-        className={cn("bg-background", isRequired && isEmpty && "bg-yellow-50", props.className)}
+        required={mustFill}
+        className={cn("bg-background", mustFill && isEmpty && "bg-yellow-50", props.className)}
         data-1p-ignore
       />
     </label>
@@ -46,9 +48,16 @@ type FormTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   isRequired?: boolean
 }
 
-export function FormTextarea({ title, hideIfEmpty = false, isRequired = false, ...props }: FormTextareaProps) {
+export function FormTextarea({
+  title,
+  hideIfEmpty = false,
+  isRequired = false,
+  required,
+  ...props
+}: FormTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isEmpty = (!props.defaultValue || props.defaultValue.toString().trim() === "") && !props.value
+  const mustFill = Boolean(isRequired || required)
 
   useEffect(() => {
     const textarea = textareaRef.current
@@ -76,7 +85,8 @@ export function FormTextarea({ title, hideIfEmpty = false, isRequired = false, .
         ref={textareaRef}
         {...props}
         id={props.id || (props as { name?: string }).name}
-        className={cn("bg-background", isRequired && isEmpty && "bg-yellow-50", props.className)}
+        required={mustFill}
+        className={cn("bg-background", mustFill && isEmpty && "bg-yellow-50", props.className)}
         data-1p-ignore
       />
     </label>
@@ -131,15 +141,17 @@ export const FormSelect = ({
         </span>
       )}
       {/* Hidden input to ensure form submissions include this value */}
-      {name && <input type="hidden" name={name} value={selectValue} />}
+      {name && <input type="hidden" name={name} value={selectValue} required={isRequired} />}
       <Select
         {...props}
+        required={isRequired}
         onValueChange={handleChange}
         {...(isControlled ? { value: props.value as string } : { defaultValue: props.defaultValue as string })}
       >
         <SelectTrigger
           id={controlId}
           aria-labelledby={labelId}
+          aria-required={isRequired || undefined}
           className={cn("w-full min-w-[150px] bg-background", isRequired && isEmpty && "bg-yellow-50")}
         >
           <SelectValue placeholder={placeholder} />

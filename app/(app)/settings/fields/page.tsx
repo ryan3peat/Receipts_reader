@@ -19,7 +19,7 @@ export default async function FieldsSettingsPage() {
     <div className="space-y-6">
       <SettingsPageHeader
         title="Fields"
-        description="Add custom fields to transactions, tweak LLM prompts, or hide fields you don't need. Leave the LLM prompt empty for fields you want to fill in manually."
+        description="Add custom fields to transactions, tweak LLM prompts, or hide fields you don't need in Transactions and Unsorted forms. Leave the LLM prompt empty for fields you want to fill in manually. Required fields always appear on the forms."
       />
       <CrudTable
         items={fieldsWithActions}
@@ -43,7 +43,7 @@ export default async function FieldsSettingsPage() {
           },
           {
             key: "isVisibleInAnalysis",
-            label: "Show in analysis form",
+            label: "Show in forms",
             type: "checkbox",
             defaultValue: false,
             editable: true,

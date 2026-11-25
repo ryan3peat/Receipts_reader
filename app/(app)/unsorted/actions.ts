@@ -3,6 +3,8 @@
 import { transactionFormSchema } from "@/forms/transactions"
 import { ActionState } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/auth"
+import { missingRequiredFormFieldNames } from "@/lib/field-validation"
+import { getFields } from "@/models/fields"
 import {
   getDirectorySize,
   getTransactionFileUploadPath,
@@ -35,6 +37,11 @@ export async function saveFileAsTransactionAction(
 
     if (!validatedForm.success) {
       return { success: false, error: validatedForm.error.message }
+    }
+
+    const missing = missingRequiredFormFieldNames(await getFields(user.id), validatedForm.data)
+    if (missing.length > 0) {
+      return { success: false, error: `Required fields missing: ${missing.join(", ")}` }
     }
 
     // Get the file record

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { ActionState } from "@/lib/actions"
 import { requestFileAnalysis } from "@/lib/analyze-client"
 import { analyzeLimiter, analyzeProgress } from "@/lib/analyze-queue"
+import { isFieldShownInForm } from "@/lib/field-validation"
 import { Category, Currency, Field, File, Project, Transaction } from "@/prisma/client"
 import { format } from "date-fns"
 import { ArrowDownToLine, Brain, Loader2, Trash2 } from "lucide-react"
@@ -302,26 +303,32 @@ export default function AnalyzeForm({
           name="name"
           value={formData.name}
           onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-          required={fieldMap.name.isRequired}
+          isRequired={fieldMap.name.isRequired}
         />
 
-        <FormInput
-          title={fieldMap.merchant.name}
-          name="merchant"
-          value={formData.merchant}
-          onChange={(e) => setFormData((prev) => ({ ...prev, merchant: e.target.value }))}
-          hideIfEmpty={!fieldMap.merchant.isVisibleInAnalysis}
-          required={fieldMap.merchant.isRequired}
-        />
+        {isFieldShownInForm(fieldMap.merchant) ? (
+          <FormInput
+            title={fieldMap.merchant.name}
+            name="merchant"
+            value={formData.merchant}
+            onChange={(e) => setFormData((prev) => ({ ...prev, merchant: e.target.value }))}
+            isRequired={fieldMap.merchant.isRequired}
+          />
+        ) : (
+          <input type="hidden" name="merchant" value={formData.merchant} />
+        )}
 
-        <FormInput
-          title={fieldMap.description.name}
-          name="description"
-          value={formData.description}
-          onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-          hideIfEmpty={!fieldMap.description.isVisibleInAnalysis}
-          required={fieldMap.description.isRequired}
-        />
+        {isFieldShownInForm(fieldMap.description) ? (
+          <FormInput
+            title={fieldMap.description.name}
+            name="description"
+            value={formData.description}
+            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+            isRequired={fieldMap.description.isRequired}
+          />
+        ) : (
+          <input type="hidden" name="description" value={formData.description} />
+        )}
 
         <div className="flex flex-wrap gap-4">
           <FormInput
@@ -337,27 +344,33 @@ export default function AnalyzeForm({
               }
             }}
             className="w-32"
-            required={fieldMap.total.isRequired}
+            isRequired={fieldMap.total.isRequired}
           />
 
-          <FormSelectCurrency
-            title={fieldMap.currencyCode.name}
-            currencies={currencies}
-            name="currencyCode"
-            value={formData.currencyCode}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, currencyCode: value }))}
-            hideIfEmpty={!fieldMap.currencyCode.isVisibleInAnalysis}
-            required={fieldMap.currencyCode.isRequired}
-          />
+          {isFieldShownInForm(fieldMap.currencyCode) ? (
+            <FormSelectCurrency
+              title={fieldMap.currencyCode.name}
+              currencies={currencies}
+              name="currencyCode"
+              value={formData.currencyCode}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, currencyCode: value }))}
+              isRequired={fieldMap.currencyCode.isRequired}
+            />
+          ) : (
+            <input type="hidden" name="currencyCode" value={formData.currencyCode} />
+          )}
 
-          <FormSelectType
-            title={fieldMap.type.name}
-            name="type"
-            value={formData.type}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, type: value }))}
-            hideIfEmpty={!fieldMap.type.isVisibleInAnalysis}
-            required={fieldMap.type.isRequired}
-          />
+          {isFieldShownInForm(fieldMap.type) ? (
+            <FormSelectType
+              title={fieldMap.type.name}
+              name="type"
+              value={formData.type}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, type: value }))}
+              isRequired={fieldMap.type.isRequired}
+            />
+          ) : (
+            <input type="hidden" name="type" value={formData.type} />
+          )}
         </div>
 
         {formData.total != 0 && formData.currencyCode && formData.currencyCode !== settings.default_currency && (
@@ -379,64 +392,83 @@ export default function AnalyzeForm({
         )}
 
         <div className="flex flex-row gap-4">
-          <FormInput
-            title={fieldMap.issuedAt.name}
-            type="date"
-            name="issuedAt"
-            value={formData.issuedAt}
-            onChange={(e) => setFormData((prev) => ({ ...prev, issuedAt: e.target.value }))}
-            hideIfEmpty={!fieldMap.issuedAt.isVisibleInAnalysis}
-            required={fieldMap.issuedAt.isRequired}
-          />
-        </div>
-
-        <div className="flex flex-row gap-4">
-          <FormSelectCategory
-            title={fieldMap.categoryCode.name}
-            categories={categories}
-            name="categoryCode"
-            value={formData.categoryCode}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, categoryCode: value }))}
-            placeholder="Select Category"
-            hideIfEmpty={!fieldMap.categoryCode.isVisibleInAnalysis}
-            required={fieldMap.categoryCode.isRequired}
-          />
-
-          {projects.length > 0 && (
-            <FormSelectProject
-              title={fieldMap.projectCode.name}
-              projects={projects}
-              name="projectCode"
-              value={formData.projectCode}
-              onValueChange={(value) => setFormData((prev) => ({ ...prev, projectCode: value }))}
-              placeholder="Select Project"
-              hideIfEmpty={!fieldMap.projectCode.isVisibleInAnalysis}
-              required={fieldMap.projectCode.isRequired}
+          {isFieldShownInForm(fieldMap.issuedAt) ? (
+            <FormInput
+              title={fieldMap.issuedAt.name}
+              type="date"
+              name="issuedAt"
+              value={formData.issuedAt}
+              onChange={(e) => setFormData((prev) => ({ ...prev, issuedAt: e.target.value }))}
+              isRequired={fieldMap.issuedAt.isRequired}
             />
+          ) : (
+            <input type="hidden" name="issuedAt" value={formData.issuedAt} />
           )}
         </div>
 
-        <FormInput
-          title={fieldMap.note.name}
-          name="note"
-          value={formData.note}
-          onChange={(e) => setFormData((prev) => ({ ...prev, note: e.target.value }))}
-          hideIfEmpty={!fieldMap.note.isVisibleInAnalysis}
-          required={fieldMap.note.isRequired}
-        />
+        <div className="flex flex-row gap-4">
+          {isFieldShownInForm(fieldMap.categoryCode) ? (
+            <FormSelectCategory
+              title={fieldMap.categoryCode.name}
+              categories={categories}
+              name="categoryCode"
+              value={formData.categoryCode}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, categoryCode: value }))}
+              placeholder="Select Category"
+              isRequired={fieldMap.categoryCode.isRequired}
+            />
+          ) : (
+            <input type="hidden" name="categoryCode" value={formData.categoryCode} />
+          )}
 
-        {extraFields.map((field) => (
+          {projects.length > 0 &&
+            (isFieldShownInForm(fieldMap.projectCode) ? (
+              <FormSelectProject
+                title={fieldMap.projectCode.name}
+                projects={projects}
+                name="projectCode"
+                value={formData.projectCode}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, projectCode: value }))}
+                placeholder="Select Project"
+                isRequired={fieldMap.projectCode.isRequired}
+              />
+            ) : (
+              <input type="hidden" name="projectCode" value={formData.projectCode} />
+            ))}
+        </div>
+
+        {isFieldShownInForm(fieldMap.note) ? (
           <FormInput
-            key={field.code}
-            type="text"
-            title={field.name}
-            name={field.code}
-            value={formData[field.code as keyof typeof formData]}
-            onChange={(e) => setFormData((prev) => ({ ...prev, [field.code]: e.target.value }))}
-            hideIfEmpty={!field.isVisibleInAnalysis}
-            required={field.isRequired}
+            title={fieldMap.note.name}
+            name="note"
+            value={formData.note}
+            onChange={(e) => setFormData((prev) => ({ ...prev, note: e.target.value }))}
+            isRequired={fieldMap.note.isRequired}
           />
-        ))}
+        ) : (
+          <input type="hidden" name="note" value={formData.note} />
+        )}
+
+        {extraFields.map((field) =>
+          isFieldShownInForm(field) ? (
+            <FormInput
+              key={field.code}
+              type="text"
+              title={field.name}
+              name={field.code}
+              value={formData[field.code as keyof typeof formData]}
+              onChange={(e) => setFormData((prev) => ({ ...prev, [field.code]: e.target.value }))}
+              isRequired={field.isRequired}
+            />
+          ) : (
+            <input
+              key={field.code}
+              type="hidden"
+              name={field.code}
+              value={String(formData[field.code as keyof typeof formData] ?? "")}
+            />
+          )
+        )}
 
         {formData.items && formData.items.length > 0 && (
           <ToolWindow title="Detected items">
@@ -451,7 +483,7 @@ export default function AnalyzeForm({
             name="text"
             value={formData.text}
             onChange={(e) => setFormData((prev) => ({ ...prev, text: e.target.value }))}
-            hideIfEmpty={!fieldMap.text.isVisibleInAnalysis}
+            hideIfEmpty={!isFieldShownInForm(fieldMap.text)}
           />
         </div>
 

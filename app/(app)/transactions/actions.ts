@@ -4,6 +4,7 @@ import { transactionFormSchema } from "@/forms/transactions"
 import { requireAccounts } from "@/lib/access"
 import { ActionState } from "@/lib/actions"
 import { getCurrentUser, isSubscriptionExpired } from "@/lib/auth"
+import { missingRequiredFormFieldNames } from "@/lib/field-validation"
 import { isManualTransactionStatus } from "@/lib/transaction-status"
 import {
   getDirectorySize,
@@ -13,7 +14,7 @@ import {
   safePathJoin,
   writeBytesIfPossible,
 } from "@/lib/files"
-import { updateField } from "@/models/fields"
+import { getFields, updateField } from "@/models/fields"
 import { createFile, deleteFile } from "@/models/files"
 import {
   bulkDeleteTransactions,
@@ -40,6 +41,11 @@ export async function createTransactionAction(
 
     if (!validatedForm.success) {
       return { success: false, error: validatedForm.error.message }
+    }
+
+    const missing = missingRequiredFormFieldNames(await getFields(user.id), validatedForm.data)
+    if (missing.length > 0) {
+      return { success: false, error: `Required fields missing: ${missing.join(", ")}` }
     }
 
     const forceSave = formData.get("forceSave") === "true"
@@ -83,6 +89,11 @@ export async function saveTransactionAction(
 
     if (!validatedForm.success) {
       return { success: false, error: validatedForm.error.message }
+    }
+
+    const missing = missingRequiredFormFieldNames(await getFields(user.id), validatedForm.data)
+    if (missing.length > 0) {
+      return { success: false, error: `Required fields missing: ${missing.join(", ")}` }
     }
 
     const transaction = await updateTransaction(transactionId, user.id, validatedForm.data)

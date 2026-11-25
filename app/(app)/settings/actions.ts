@@ -302,6 +302,8 @@ export async function addFieldAction(data: Prisma.FieldCreateInput) {
     isExtra: true,
   })
   revalidatePath("/settings/fields")
+  revalidatePath("/transactions")
+  revalidatePath("/unsorted")
 
   return { success: true, field }
 }
@@ -326,6 +328,8 @@ export async function editFieldAction(code: string, data: Prisma.FieldUpdateInpu
       isRequired: validatedForm.data.isRequired,
     })
     revalidatePath("/settings/fields")
+    revalidatePath("/transactions")
+    revalidatePath("/unsorted")
     return { success: true, field }
   } catch (error) {
     return ownedWriteError("update", "field", error)
@@ -342,5 +346,7 @@ export async function deleteFieldAction(code: string) {
     return ownedWriteError("delete", "field", error)
   }
   revalidatePath("/settings/fields")
+  revalidatePath("/transactions")
+  revalidatePath("/unsorted")
   return { success: true }
 }
