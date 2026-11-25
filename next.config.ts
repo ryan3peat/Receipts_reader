@@ -7,10 +7,12 @@ const nextConfig: NextConfig = {
   },
   // mupdf reads its wasm file from disk by its own path, so it must not be bundled.
   serverExternalPackages: ["@prisma/adapter-pg", "exceljs", "mupdf"],
-  // Vercel only deploys files it can trace. The wasm file is opened by path, so trace it explicitly for statement routes.
+  // Vercel only deploys files it can trace. The wasm file is opened by path, so trace it for every route that renders a PDF.
   outputFileTracingIncludes: {
     "/sap": ["./node_modules/mupdf/dist/mupdf-wasm.wasm"],
     "/sap/**": ["./node_modules/mupdf/dist/mupdf-wasm.wasm"],
+    "/api/unsorted/analyze": ["./node_modules/mupdf/dist/mupdf-wasm.wasm"],
+    "/files/preview/[fileId]": ["./node_modules/mupdf/dist/mupdf-wasm.wasm"],
   },
   experimental: {
     serverActions: {

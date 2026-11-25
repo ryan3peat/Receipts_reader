@@ -15,7 +15,7 @@ export function previewContentType(format: PreviewFormat): string {
   return format === "jpeg" ? "image/jpeg" : `image/${format}`
 }
 
-/** File extension used for cached preview files (jpeg → jpg for GraphicsMagick). */
+/** File extension used for cached preview files (jpeg → jpg). */
 export function previewExtension(format: PreviewFormat): string {
   return format === "jpeg" ? "jpg" : format
 }
