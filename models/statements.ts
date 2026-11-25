@@ -23,6 +23,7 @@ export function toSapReceipt(transaction: {
   id: string
   issuedAt: Date | null
   total: number | null
+  convertedTotal?: number | null
   extra: unknown
   merchant: string | null
   name: string | null
@@ -34,6 +35,7 @@ export function toSapReceipt(transaction: {
     id: transaction.id,
     issuedOn: dayOf(transaction.issuedAt),
     totalCents: transaction.total,
+    convertedTotalCents: transaction.convertedTotal ?? null,
     vatCents: resolveVatCents(transaction.total, transaction.extra),
     merchant: transaction.merchant,
     name: transaction.name,
@@ -43,12 +45,32 @@ export function toSapReceipt(transaction: {
   }
 }
 
+/**
+ * Receipts for matching a cardholder's statement: owned by them, or saved from a file they uploaded
+ * (Accounts may have stamped themselves as submitter when reviewing).
+ */
 export async function receiptsForEmployee(userId: string, employeeId: string) {
-  const rows = await prisma.transaction.findMany({
+  const uploadedFiles = await prisma.file.findMany({
     where: { userId, submittedById: employeeId },
+    select: { id: true },
+  })
+  const fileIds = uploadedFiles.map((file) => file.id)
+  const rows = await prisma.transaction.findMany({
+    where: {
+      userId,
+      OR: [
+        { submittedById: employeeId },
+        ...(fileIds.length > 0 ? fileIds.map((id) => ({ files: { array_contains: [id] } })) : []),
+      ],
+    },
     orderBy: { issuedAt: "asc" },
   })
-  return rows.map(toSapReceipt)
+  const seen = new Set<string>()
+  return rows.flatMap((row) => {
+    if (seen.has(row.id)) return []
+    seen.add(row.id)
+    return [toSapReceipt(row)]
+  })
 }
 
 export async function sapCatalog(userId: string, employeeCode: string) {

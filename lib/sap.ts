@@ -10,6 +10,8 @@ export type SapReceipt = {
   id: string
   issuedOn: string | null
   totalCents: number | null
+  /** Card/statement currency total when the receipt was in a foreign currency. */
+  convertedTotalCents: number | null
   vatCents: number
   merchant: string | null
   name: string | null
@@ -494,21 +496,53 @@ export type StatementMatch = {
   receipt: SapReceipt | null
 }
 
+/** Amounts on a receipt that can be compared to a statement charge (prefer converted AUD when present). */
+export function receiptAmountCandidates(receipt: SapReceipt): number[] {
+  const amounts: number[] = []
+  if (receipt.convertedTotalCents != null && receipt.convertedTotalCents > 0) amounts.push(receipt.convertedTotalCents)
+  if (receipt.totalCents != null && receipt.totalCents > 0) amounts.push(receipt.totalCents)
+  return amounts
+}
+
+function amountGapToLine(receipt: SapReceipt, lineAmountCents: number): number | null {
+  const amounts = receiptAmountCandidates(receipt)
+  if (amounts.length === 0) return null
+  return Math.min(...amounts.map((amount) => Math.abs(amount - lineAmountCents)))
+}
+
+/** Words from merchant/name/description that can appear on a bank narrative. */
+export function receiptNarrativeTokens(receipt: SapReceipt): string[] {
+  const text = [receipt.merchant, receipt.name, receipt.description].filter(Boolean).join(" ").toLowerCase()
+  return text.split(/[^a-z0-9]+/).filter((token) => token.length > 3)
+}
+
+function tokenHits(receipt: SapReceipt, narrative: string): number {
+  const lower = narrative.toLowerCase()
+  return receiptNarrativeTokens(receipt).filter((token) => lower.includes(token)).length
+}
+
+/**
+ * Match statement purchases to receipts for one cardholder.
+ * Exact/near amount (±$1 or 2%) is preferred. FX and similar cases can still match when the
+ * merchant/name shows up in the narrative and the amount is within 15% or $25.
+ */
 export function matchStatementLines(lines: StatementPurchase[], receipts: SapReceipt[]): StatementMatch[] {
   const used = new Set<string>()
   return lines.map((line) => {
     if (line.kind !== "purchase") return { line, receipt: null }
     let best: { receipt: SapReceipt; score: number } | null = null
     for (const receipt of receipts) {
-      if (used.has(receipt.id) || receipt.totalCents == null) continue
-      const amountGap = Math.abs(receipt.totalCents - line.amountCents)
+      if (used.has(receipt.id)) continue
+      const amountGap = amountGapToLine(receipt, line.amountCents)
+      if (amountGap === null) continue
       const dayGap = daysApart(line.postedOn, receipt.issuedOn)
-      const closeEnough = amountGap <= 100 || amountGap / Math.max(line.amountCents, 1) <= 0.02
-      if (!closeEnough || dayGap > 7) continue
-      const merchant = (receipt.merchant || "").toLowerCase()
-      const narrative = line.narrative.toLowerCase()
-      const tokenHit = merchant.split(/\s+/).filter((token) => token.length > 3 && narrative.includes(token)).length
-      const score = amountGap + dayGap * 20 - tokenHit * 30
+      if (dayGap > 7) continue
+      const hits = tokenHits(receipt, line.narrative)
+      const tight = amountGap <= 100 || amountGap / Math.max(line.amountCents, 1) <= 0.02
+      const fxSoft =
+        hits >= 1 && (amountGap <= 2500 || amountGap / Math.max(line.amountCents, 1) <= 0.15)
+      if (!tight && !fxSoft) continue
+      const score = amountGap + dayGap * 20 - hits * 30
       if (!best || score < best.score) best = { receipt, score }
     }
     if (best) used.add(best.receipt.id)
@@ -579,6 +613,7 @@ export function sapRowsForStatement(
           id: line.id,
           issuedOn: line.postedOn,
           totalCents: line.amountCents,
+          convertedTotalCents: null,
           vatCents: 0,
           merchant: null,
           name: null,

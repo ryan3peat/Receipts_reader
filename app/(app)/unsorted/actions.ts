@@ -69,7 +69,10 @@ export async function saveFileAsTransactionAction(
       }
     }
 
-    const transaction = await createTransaction(user.id, validatedForm.data)
+    // Keep ownership with whoever uploaded the receipt, even when Accounts reviews and saves it.
+    const transaction = await createTransaction(user.id, validatedForm.data, {
+      submittedById: file.submittedById || undefined,
+    })
 
     // Move file to processed location
     const userUploadsDirectory = getUserUploadsDirectory(user)

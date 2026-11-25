@@ -62,6 +62,7 @@ describe("matchStatementLines", () => {
     id: "r1",
     issuedOn: "2026-09-10",
     totalCents: 66073,
+    convertedTotalCents: null,
     vatCents: 6007,
     merchant: "Go 2 Cafe",
     name: "Flavour Academy catering",
@@ -90,6 +91,62 @@ describe("matchStatementLines", () => {
     const matches = matchStatementLines(lines, [receipt])
     expect(matches[0].receipt?.id).toBe("r1")
     expect(missingPurchases(matches).map((match) => match.line.id)).toEqual(["s2"])
+  })
+
+  it("matches an FX receipt using the converted AUD total against the statement charge", () => {
+    const fxReceipt: SapReceipt = {
+      id: "fx1",
+      issuedOn: "2026-09-12",
+      totalCents: 10000,
+      convertedTotalCents: 10600,
+      vatCents: 0,
+      merchant: "xAI",
+      name: "Grok subscription",
+      description: null,
+      categoryCode: "2065",
+      projectCode: null,
+    }
+    const matches = matchStatementLines(
+      [
+        {
+          id: "s-fx",
+          postedOn: "2026-09-13",
+          narrative: "XAI GROK SUBSCRIPTION FOREIGN CURRENCY",
+          amountCents: 10600,
+          kind: "purchase",
+        },
+      ],
+      [fxReceipt]
+    )
+    expect(matches[0].receipt?.id).toBe("fx1")
+  })
+
+  it("matches an FX receipt when only the foreign total is stored but the narrative matches", () => {
+    const fxReceipt: SapReceipt = {
+      id: "fx2",
+      issuedOn: "2026-09-12",
+      totalCents: 10000,
+      convertedTotalCents: null,
+      vatCents: 0,
+      merchant: "xAI",
+      name: "Grok subscription",
+      description: null,
+      categoryCode: "2065",
+      projectCode: null,
+    }
+    const matches = matchStatementLines(
+      [
+        {
+          id: "s-fx",
+          postedOn: "2026-09-13",
+          narrative: "XAI GROK SUBSCRIPTION FOREIGN CURRENCY",
+          amountCents: 10600,
+          kind: "purchase",
+        },
+      ],
+      [fxReceipt]
+    )
+    expect(matches[0].receipt?.id).toBe("fx2")
   })
 
   it("highlights the unmatched purchase on the FOR SAP rows", () => {

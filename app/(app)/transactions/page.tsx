@@ -26,7 +26,8 @@ const TRANSACTIONS_PER_PAGE = 500
 export default async function TransactionsPage({ searchParams }: { searchParams: Promise<TransactionFilters> }) {
   const { page, ...filters } = await searchParams
   const [user, actor, people] = await Promise.all([getCurrentUser(), getActor(), listMembers()])
-  const isAccounts = actor.effectiveRole === "accounts"
+  // realRole keeps Accounts tools (owner column, filters) visible even in User View.
+  const isAccounts = actor.realRole === "accounts"
   const { transactions, total } = await getTransactions(user.id, filters, {
     limit: TRANSACTIONS_PER_PAGE,
     offset: ((page ?? 1) - 1) * TRANSACTIONS_PER_PAGE,

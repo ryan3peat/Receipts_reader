@@ -191,11 +191,17 @@ async function withOwnedRelations(userId: string, standard: TransactionData) {
   return standard
 }
 
-export const createTransaction = async (userId: string, data: TransactionData): Promise<Transaction> => {
+export const createTransaction = async (
+  userId: string,
+  data: TransactionData,
+  options?: { submittedById?: string | null }
+): Promise<Transaction> => {
   const { standard, extra } = await splitTransactionDataExtraFields(data, userId)
   await withOwnedRelations(userId, standard)
   const { getActor } = await import("@/lib/access")
   const actor = await getActor()
+  // Prefer the uploader when Accounts reviews someone else's receipt; otherwise the person saving it.
+  const submittedById = options?.submittedById || actor.user.id
 
   const newTransaction = await prisma.transaction.create({
     data: {
@@ -203,7 +209,7 @@ export const createTransaction = async (userId: string, data: TransactionData): 
       extra: extra,
       items: data.items as Prisma.InputJsonValue,
       userId,
-      submittedById: actor.user.id,
+      submittedById,
     },
   })
 
