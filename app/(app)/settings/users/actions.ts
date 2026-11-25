@@ -14,7 +14,7 @@ export async function addMemberAction(_prev: { success: boolean; error?: string 
     .trim()
     .toLowerCase()
   const name = String(formData.get("name") || "").trim()
-  const role = formData.get("role") === "accounts" || isMasterAdminEmail(email) ? "accounts" : "sales"
+  const role = formData.get("role") === "accounts" || isMasterAdminEmail(email) ? "accounts" : "cardholder"
 
   if (!email.includes("@") || email.endsWith("@localhost")) {
     return { success: false, error: "Enter a real email address" }
@@ -37,7 +37,7 @@ export async function addMemberAction(_prev: { success: boolean; error?: string 
   return { success: true }
 }
 
-export async function updateMemberRoleAction(userId: string, role: "accounts" | "sales") {
+export async function updateMemberRoleAction(userId: string, role: "accounts" | "cardholder") {
   const gate = await requireMasterAdmin()
   if (!gate.ok) return { success: false, error: gate.error }
 
@@ -51,7 +51,7 @@ export async function updateMemberRoleAction(userId: string, role: "accounts" | 
     return { success: false, error: "The Master Admin stays an admin" }
   }
 
-  if (role === "sales") {
+  if (role === "cardholder") {
     const remaining = await prisma.user.count({ where: { role: "accounts", NOT: { id: userId } } })
     if (remaining < 1) return { success: false, error: "Keep at least one accounts user" }
   }

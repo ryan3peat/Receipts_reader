@@ -12,7 +12,7 @@ import { getTransactionById } from "./transactions"
 export const getUnsortedFiles = cache(async (userId: string, submittedById?: string) => {
   const where: Prisma.FileWhereInput = { isReviewed: false, userId }
   if (submittedById) where.submittedById = submittedById
-  // Sales scoping runs last so it always wins over the requested filter.
+  // Cardholder scoping runs last so it always wins over the requested filter.
   await scopeFileWhere(where)
   return await prisma.file.findMany({
     where,

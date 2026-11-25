@@ -34,7 +34,7 @@ export function emailToEnrol(profile: MicrosoftProfile): string | null {
   return email
 }
 
-// Creates the account for a company person signing in for the first time. Everyone starts as Sales, which only
+// Creates the account for a company person signing in for the first time. Everyone starts as Cardholder, which only
 // shows them their own receipts; the Master Admin promotes people on the People page.
 //
 // It runs before the sign-in library looks the person up, so the library then finds them and signs them in the
@@ -52,7 +52,7 @@ export async function enrolOnFirstSignIn(profile: MicrosoftProfile): Promise<voi
       data: {
         email,
         name,
-        role: isMasterAdminEmail(email) ? "accounts" : "sales",
+        role: isMasterAdminEmail(email) ? "accounts" : "cardholder",
         membershipPlan: "unlimited",
         emailVerified: true,
       },

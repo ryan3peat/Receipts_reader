@@ -9,6 +9,10 @@ import { useActionState, useState, useTransition } from "react"
 
 type Member = { id: string; email: string; name: string; role: string }
 
+function isCardholderRole(role: string) {
+  return role === "cardholder" || role === "sales"
+}
+
 export function MembersForm({
   members,
   companyUserId,
@@ -23,7 +27,7 @@ export function MembersForm({
   selfEnrolDomain: string | null
 }) {
   const [state, action, pending] = useActionState(addMemberAction, null)
-  const [role, setRole] = useState("sales")
+  const [role, setRole] = useState("cardholder")
   const [updating, startUpdate] = useTransition()
   const [roleError, setRoleError] = useState<string | null>(null)
 
@@ -42,12 +46,15 @@ export function MembersForm({
                 <p className="text-sm text-muted-foreground">{member.email}</p>
               </div>
               <Select
-                value={member.role === "sales" && !isMaster ? "sales" : "accounts"}
+                value={isCardholderRole(member.role) && !isMaster ? "cardholder" : "accounts"}
                 disabled={!canManage || updating || member.id === companyUserId || isMaster}
                 onValueChange={(value) => {
                   setRoleError(null)
                   startUpdate(async () => {
-                    const result = await updateMemberRoleAction(member.id, value === "accounts" ? "accounts" : "sales")
+                    const result = await updateMemberRoleAction(
+                      member.id,
+                      value === "accounts" ? "accounts" : "cardholder"
+                    )
                     if (!result.success) setRoleError(result.error || "Could not change the role")
                   })
                 }}
@@ -57,7 +64,7 @@ export function MembersForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="accounts">Accounts</SelectItem>
-                  <SelectItem value="sales">Sales</SelectItem>
+                  <SelectItem value="cardholder">Cardholder</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -83,7 +90,7 @@ export function MembersForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="sales">Sales</SelectItem>
+              <SelectItem value="cardholder">Cardholder</SelectItem>
               <SelectItem value="accounts">Accounts</SelectItem>
             </SelectContent>
           </Select>

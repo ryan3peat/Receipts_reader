@@ -55,14 +55,14 @@ describe("addMemberAction", () => {
     })
   })
 
-  it("defaults to sales when the role is missing or unknown", async () => {
+  it("defaults to cardholder when the role is missing or unknown", async () => {
     await addMemberAction(null, person({ email: "new@ef.test", name: "New", role: "owner" }))
 
-    expect(mocks.user.create.mock.calls[0][0].data.role).toBe("sales")
+    expect(mocks.user.create.mock.calls[0][0].data.role).toBe("cardholder")
   })
 
   it("always adds the Master Admin as accounts", async () => {
-    await addMemberAction(null, person({ email: "Master@EF.test", name: "Boss", role: "sales" }))
+    await addMemberAction(null, person({ email: "Master@EF.test", name: "Boss", role: "cardholder" }))
 
     expect(mocks.user.create.mock.calls[0][0].data).toMatchObject({ email: "master@ef.test", role: "accounts" })
   })
@@ -89,23 +89,23 @@ describe("updateMemberRoleAction", () => {
   })
 
   it("changes a person's role", async () => {
-    const result = await updateMemberRoleAction("member", "sales")
+    const result = await updateMemberRoleAction("member", "cardholder")
 
     expect(result).toEqual({ success: true })
-    expect(mocks.user.update).toHaveBeenCalledWith({ where: { id: "member" }, data: { role: "sales" } })
+    expect(mocks.user.update).toHaveBeenCalledWith({ where: { id: "member" }, data: { role: "cardholder" } })
   })
 
   it("never demotes the Master Admin", async () => {
     vi.mocked(getUserById).mockResolvedValue({ id: "boss", email: "master@ef.test" } as Found)
 
-    const result = await updateMemberRoleAction("boss", "sales")
+    const result = await updateMemberRoleAction("boss", "cardholder")
 
     expect(result).toEqual({ success: false, error: "The Master Admin stays an admin" })
     expect(mocks.user.update).not.toHaveBeenCalled()
   })
 
   it("never demotes the default account", async () => {
-    const result = await updateMemberRoleAction("company", "sales")
+    const result = await updateMemberRoleAction("company", "cardholder")
 
     expect(result).toEqual({ success: false, error: "The default account stays an admin" })
     expect(mocks.user.update).not.toHaveBeenCalled()
@@ -123,7 +123,7 @@ describe("updateMemberRoleAction", () => {
   it("keeps at least one accounts user", async () => {
     mocks.user.count.mockResolvedValue(0)
 
-    const result = await updateMemberRoleAction("member", "sales")
+    const result = await updateMemberRoleAction("member", "cardholder")
 
     expect(result).toEqual({ success: false, error: "Keep at least one accounts user" })
     expect(mocks.user.update).not.toHaveBeenCalled()

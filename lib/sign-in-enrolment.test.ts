@@ -97,7 +97,7 @@ describe("emailToEnrol", () => {
 })
 
 describe("enrolOnFirstSignIn", () => {
-  it("creates a Sales account, already verified, with the name from Microsoft", async () => {
+  it("creates a Cardholder account, already verified, with the name from Microsoft", async () => {
     await enrolOnFirstSignIn(staff)
 
     expect(mocks.user.findUnique).toHaveBeenCalledWith({ where: { email: "jo.bloggs@ef.test" }, select: { id: true } })
@@ -106,7 +106,7 @@ describe("enrolOnFirstSignIn", () => {
       data: {
         email: "jo.bloggs@ef.test",
         name: "Jo Bloggs",
-        role: "sales",
+        role: "cardholder",
         membershipPlan: "unlimited",
         emailVerified: true,
       },
@@ -116,7 +116,7 @@ describe("enrolOnFirstSignIn", () => {
   it("never creates an Accounts user, whatever the profile claims", async () => {
     await enrolOnFirstSignIn({ ...staff, role: "accounts", isAdmin: true } as typeof staff)
 
-    expect(mocks.user.create.mock.calls[0][0].data.role).toBe("sales")
+    expect(mocks.user.create.mock.calls[0][0].data.role).toBe("cardholder")
   })
 
   it("creates the Master Admin as Accounts", async () => {

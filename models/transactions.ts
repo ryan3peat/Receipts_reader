@@ -258,7 +258,7 @@ export const deleteTransaction = async (id: string, userId: string): Promise<Tra
 }
 
 export const bulkDeleteTransactions = async (ids: string[], userId: string) => {
-  // Sales may only delete what they submitted, so resolve the allowed rows first.
+  // Cardholders may only delete what they submitted, so resolve the allowed rows first.
   const where: Prisma.TransactionWhereInput = { id: { in: ids }, userId }
   await scopeTransactionWhere(where)
   const allowed = await prisma.transaction.findMany({ where, select: { id: true, files: true } })

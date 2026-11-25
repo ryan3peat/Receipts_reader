@@ -139,16 +139,29 @@ export function StatementForm({ employees }: { employees: SapEmployee[] }) {
   return (
     <div className="space-y-6 max-w-3xl">
       <form onSubmit={upload} className="space-y-3 max-w-xl">
-        <label className="flex flex-col gap-1 text-sm font-medium">
+        <label className="flex flex-col gap-2 text-sm font-medium">
           Credit card statement PDF
-          <Input name="statement" type="file" accept="application/pdf,.pdf" required disabled={busy} />
+          <span
+            className={`flex cursor-pointer flex-col items-start gap-2 rounded-md border-2 border-dashed border-muted-foreground/40 bg-muted/60 px-4 py-5 transition-colors hover:border-primary hover:bg-muted ${busy ? "pointer-events-none opacity-50" : ""}`}
+          >
+            <span className="text-sm font-medium text-foreground">Choose PDF file</span>
+            <span className="text-xs text-muted-foreground">Click here to select the credit card statement</span>
+            <Input
+              name="statement"
+              type="file"
+              accept="application/pdf,.pdf"
+              required
+              disabled={busy}
+              className="h-auto cursor-pointer border-0 bg-background/80 p-2 shadow-none file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
+            />
+          </span>
         </label>
         <p className="text-xs text-muted-foreground">
           One PDF can hold every cardholder. The statement is read one page at a time, then each card is matched to a
           person by card number, then by name, and saved against them.
         </p>
         <Button type="submit" disabled={busy}>
-          {busy ? "Working..." : "Read statement and find missing receipts"}
+          {busy ? "Working..." : "Upload Statement"}
         </Button>
       </form>
 

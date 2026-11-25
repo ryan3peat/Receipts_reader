@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 export default async function Dashboard({ searchParams }: { searchParams: Promise<TransactionFilters> }) {
   const filters = await searchParams
   const [user, actor] = await Promise.all([getCurrentUser(), getActor()])
-  const showOwnMissing = actor.effectiveRole === "sales" || actor.user.id !== actor.companyUser.id
+  const showOwnMissing = actor.effectiveRole === "cardholder" || actor.user.id !== actor.companyUser.id
   const [unsortedFiles, settings, missing] = await Promise.all([
     getUnsortedFiles(user.id),
     getSettings(user.id),

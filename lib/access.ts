@@ -11,7 +11,7 @@ import { cache } from "react"
 
 export { ADMIN_BRIDGE_COOKIE, LOGIN_COOKIE, LOGIN_SETTING, USER_VIEW_COOKIE } from "@/lib/access-cookies"
 
-export type AppRole = "accounts" | "sales"
+export type AppRole = "accounts" | "cardholder"
 
 export type Actor = {
   user: User
@@ -26,7 +26,8 @@ export type Actor = {
 function roleOf(user: User): AppRole {
   // The Master Admin can never be locked out by a role stored in the database.
   if (isMasterAdminEmail(user.email)) return "accounts"
-  return user.role === "sales" ? "sales" : "accounts"
+  // "sales" is the old name for this role and is still accepted so a person is not locked out during the rename.
+  return user.role === "cardholder" || user.role === "sales" ? "cardholder" : "accounts"
 }
 
 export const getCompanyUser = cache(async () => {
@@ -68,7 +69,7 @@ export const resolveActor = cache(async (): Promise<Actor | null> => {
     user,
     companyUser,
     realRole,
-    effectiveRole: userView ? "sales" : realRole,
+    effectiveRole: userView ? "cardholder" : realRole,
     loginRequired,
     userView,
     // The default account counts as well: it is everyone while sign-in is not set up, and nobody afterwards.

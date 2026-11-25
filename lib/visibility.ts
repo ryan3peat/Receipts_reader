@@ -3,7 +3,7 @@ import { Prisma } from "@/prisma/client"
 export async function submitterId(): Promise<string | undefined> {
   const { getActor } = await import("@/lib/access")
   const actor = await getActor()
-  if (actor.effectiveRole === "sales") return actor.user.id
+  if (actor.effectiveRole === "cardholder") return actor.user.id
   return undefined
 }
 

@@ -49,7 +49,7 @@ beforeEach(() => {
     company: { id: "company", email: "taxhacker@localhost", role: "accounts" },
     master: { id: "master", email: MASTER, role: "accounts" },
     accounts: { id: "accounts", email: "accounts@ef.test", role: "accounts" },
-    sales: { id: "sales", email: "sales@ef.test", role: "sales" },
+    cardholder: { id: "cardholder", email: "cardholder@ef.test", role: "cardholder" },
   }
 })
 
@@ -97,14 +97,14 @@ describe("who counts as the Master Admin", () => {
     expect(await resolveActor()).toMatchObject({ isMaster: false, realRole: "accounts" })
   })
 
-  it("is not a sales person", async () => {
-    signInAs("sales")
+  it("is not a cardholder", async () => {
+    signInAs("cardholder")
 
-    expect(await resolveActor()).toMatchObject({ isMaster: false, realRole: "sales" })
+    expect(await resolveActor()).toMatchObject({ isMaster: false, realRole: "cardholder" })
   })
 
-  it("stays an accounts user even if the database says sales", async () => {
-    state.users.master.role = "sales"
+  it("stays an accounts user even if the database says cardholder", async () => {
+    state.users.master.role = "cardholder"
     signInAs("master")
 
     expect(await resolveActor()).toMatchObject({ isMaster: true, realRole: "accounts", effectiveRole: "accounts" })
@@ -172,8 +172,8 @@ describe("requireMasterAdmin", () => {
     expect(await requireMasterAdmin()).toEqual({ ok: false, error: "Only the Master Admin can do that" })
   })
 
-  it("refuses a sales person", async () => {
-    signInAs("sales")
+  it("refuses a cardholder", async () => {
+    signInAs("cardholder")
 
     expect(await requireMasterAdmin()).toEqual({ ok: false, error: "Only accounts can do that" })
   })

@@ -8,14 +8,14 @@ export default async function UsersSettingsPage() {
   const [actor, members] = await Promise.all([getActor(), listMembers()])
   const domain = getCompanyEmailDomain()
   const whoCanSignIn = domain
-    ? `Anyone with an @${domain} Microsoft account can sign in and appears here after their first sign-in, starting as Sales.`
+    ? `Anyone with an @${domain} Microsoft account can sign in and appears here after their first sign-in, starting as Cardholder.`
     : "Only people on this list can sign in."
 
   return (
     <div className="space-y-6">
       <SettingsPageHeader
         title="People"
-        description={`${whoCanSignIn} Sales can upload and see their own receipts. Accounts can see every expense, change settings, and download reports. Names come from Microsoft 365.`}
+        description={`${whoCanSignIn} Cardholders can upload and see their own receipts. Accounts can see every expense, change settings, and download reports. Names come from Microsoft 365.`}
       />
       <MembersForm
         members={members}

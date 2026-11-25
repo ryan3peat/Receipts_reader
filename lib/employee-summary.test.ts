@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest"
 import { summarizeEmployees, totalEmployeeSummaries } from "./employee-summary"
 
 const members = [
-  { id: "zoe", name: "Zoe", email: "zoe@ef.test", role: "sales" },
-  { id: "adam", name: "Adam", email: "adam@ef.test", role: "sales" },
+  { id: "zoe", name: "Zoe", email: "zoe@ef.test", role: "cardholder" },
+  { id: "adam", name: "Adam", email: "adam@ef.test", role: "cardholder" },
   { id: "acct", name: "", email: "accounts@ef.test", role: "accounts" },
 ]
 

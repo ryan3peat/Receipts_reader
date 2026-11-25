@@ -66,7 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <SidebarInset className="w-full h-full mt-[60px] md:mt-0 overflow-auto pb-20 md:pb-0">
             {actor.userView && (
               <div className="border-b bg-amber-50 px-4 py-2 text-sm text-amber-950">
-                User View is on. You are seeing the sales experience. Turn it off in the sidebar to return to accounts.
+                User View is on. You are seeing the cardholder experience. Turn it off in the sidebar to return to accounts.
               </div>
             )}
             {isSubscriptionExpired(user) && <SubscriptionExpired />}

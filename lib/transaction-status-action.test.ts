@@ -26,7 +26,7 @@ beforeEach(() => {
 })
 
 describe("bulkSetTransactionStatusAction", () => {
-  it("refuses a sales user before touching any transaction", async () => {
+  it("refuses a cardholder before touching any transaction", async () => {
     vi.mocked(requireAccounts).mockResolvedValue({ ok: false, error: "Only accounts can do that" } as Gate)
 
     const result = await bulkSetTransactionStatusAction(["a"], "reviewed")

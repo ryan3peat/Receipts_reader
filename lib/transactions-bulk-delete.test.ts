@@ -15,7 +15,7 @@ vi.mock("@/models/fields", () => ({ getFields: vi.fn(async () => []) }))
 import { bulkDeleteTransactions, bulkSetTransactionStatus } from "@/models/transactions"
 
 const company = "company"
-const sales = { effectiveRole: "sales", user: { id: "sales-a" } }
+const cardholder = { effectiveRole: "cardholder", user: { id: "cardholder-a" } }
 const accounts = { effectiveRole: "accounts", user: { id: "accounts-a" } }
 
 beforeEach(() => {
@@ -25,8 +25,8 @@ beforeEach(() => {
 })
 
 describe("bulkDeleteTransactions", () => {
-  it("limits a sales user to transactions they submitted", async () => {
-    mocks.getActor.mockResolvedValue(sales)
+  it("limits a cardholder to transactions they submitted", async () => {
+    mocks.getActor.mockResolvedValue(cardholder)
     // The database only returns the caller's own row for the scoped lookup.
     mocks.transaction.findMany.mockResolvedValue([{ id: "mine", files: [] }])
 
@@ -35,14 +35,14 @@ describe("bulkDeleteTransactions", () => {
     expect(mocks.transaction.findMany.mock.calls[0][0].where).toEqual({
       id: { in: ["mine", "someone-elses"] },
       userId: company,
-      submittedById: "sales-a",
+      submittedById: "cardholder-a",
     })
     expect(mocks.transaction.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ["mine"] }, userId: company } })
     expect(result).toEqual({ count: 1 })
   })
 
-  it("deletes nothing when none of the requested rows belong to the sales user", async () => {
-    mocks.getActor.mockResolvedValue(sales)
+  it("deletes nothing when none of the requested rows belong to the cardholder", async () => {
+    mocks.getActor.mockResolvedValue(cardholder)
     mocks.transaction.findMany.mockResolvedValue([])
 
     const result = await bulkDeleteTransactions(["someone-elses"], company)
