@@ -95,6 +95,78 @@ export function gstLines(totalCents: number | null, vatCents: number): GstLine[]
   return [{ gstCode: "P1", amountCents: Math.max(0, total - vatCents) }]
 }
 
+/** Entertainment GLs that use the ATO 50-50 FBT method on SAP export. */
+export const FBT_50_50_CODES = new Set(["2210", "2211"])
+
+export type FbtSplitLine = GstLine & { glCode: "2210" | "2211" }
+
+/**
+ * Split entertainment spend for FBT filing: 50% to 2210 (P2, no GST claimed),
+ * remaining 50% to 2211 with half the receipt GST (P1 / P2 as needed).
+ * Amounts are ex-GST for P1 and gross for P2, matching gstLines / SAP "Amount after GST".
+ *
+ * The deductible half reconstructs taxable ex-GST as GST×10 so a GST-free
+ * component survives (gstLines would otherwise collapse near-1/11 halves to one P1).
+ */
+export function entertainmentFbtSplits(totalCents: number | null, vatCents: number): FbtSplitLine[] {
+  const total = Math.max(0, totalCents ?? 0)
+  const vat = Math.max(0, vatCents)
+  const nonDeductibleGross = Math.round(total / 2)
+  const deductibleGross = total - nonDeductibleGross
+  const deductibleGst = Math.floor(vat / 2)
+
+  const lines: FbtSplitLine[] = [
+    {
+      glCode: "2210",
+      gstCode: "P2",
+      amountCents: nonDeductibleGross,
+      note: "FBT 50-50: non-deductible half (no GST claim)",
+    },
+  ]
+
+  if (deductibleGross <= 0) return lines
+
+  if (deductibleGst <= 0) {
+    lines.push({
+      glCode: "2211",
+      gstCode: "P2",
+      amountCents: deductibleGross,
+      note: "FBT 50-50: deductible half (GST-free)",
+    })
+    return lines
+  }
+
+  const taxableEx = Math.round(deductibleGst * 10)
+  const gstFree = deductibleGross - deductibleGst - taxableEx
+
+  if (taxableEx > 0) {
+    lines.push({
+      glCode: "2211",
+      gstCode: "P1",
+      amountCents: taxableEx,
+      note: "FBT 50-50: deductible half (GST claimable)",
+    })
+  }
+
+  if (gstFree > 0) {
+    lines.push({
+      glCode: "2211",
+      gstCode: "P2",
+      amountCents: gstFree,
+      note: "FBT 50-50: deductible half (GST-free component)",
+    })
+  } else if (taxableEx <= 0) {
+    lines.push({
+      glCode: "2211",
+      gstCode: "P1",
+      amountCents: Math.max(0, deductibleGross - deductibleGst),
+      note: "FBT 50-50: deductible half (GST claimable)",
+    })
+  }
+
+  return lines
+}
+
 export function classifyLine(narrative: string, kind: string): LineKind {
   const text = narrative.toLowerCase()
   if (text.includes("card fee") || /\bfees?\b/.test(text)) return "fee"
@@ -563,28 +635,48 @@ function rowsForReceipt(
   catalog: Catalog,
   missing: boolean
 ): SapRow[] {
-  const splits = missing ? [] : gstLines(receipt.totalCents, receipt.vatCents)
-  const glName = (receipt.categoryCode && catalog.categories.get(receipt.categoryCode)) || ""
   const project =
     (receipt.projectCode && (catalog.projects.get(receipt.projectCode) || receipt.projectCode)) || ""
   const description = receipt.name || receipt.description || ""
-  if (splits.length === 0) {
+  const useFbt =
+    !missing && !!receipt.categoryCode && FBT_50_50_CODES.has(receipt.categoryCode)
+
+  if (missing) {
     return [
       {
         date,
         narrative,
-        description: missing ? "MISSING RECEIPT" : description,
-        glCode: missing ? "" : receipt.categoryCode || "",
-        glName: missing ? "" : glName,
-        project: missing ? "" : project,
+        description: "MISSING RECEIPT",
+        glCode: "",
+        glName: "",
+        project: "",
         gstCode: "",
         amountCents: receipt.totalCents ?? 0,
         dimension: catalog.dimension,
-        note: missing ? "No receipt uploaded. Amount is the card charge, GST unknown." : "",
-        missing,
+        note: "No receipt uploaded. Amount is the card charge, GST unknown.",
+        missing: true,
       },
     ]
   }
+
+  if (useFbt) {
+    return entertainmentFbtSplits(receipt.totalCents, receipt.vatCents).map((split) => ({
+      date,
+      narrative,
+      description,
+      glCode: split.glCode,
+      glName: catalog.categories.get(split.glCode) || "",
+      project,
+      gstCode: split.gstCode,
+      amountCents: split.amountCents,
+      dimension: catalog.dimension,
+      note: split.note || "",
+      missing: false,
+    }))
+  }
+
+  const splits = gstLines(receipt.totalCents, receipt.vatCents)
+  const glName = (receipt.categoryCode && catalog.categories.get(receipt.categoryCode)) || ""
   return splits.map((split) => ({
     date,
     narrative,

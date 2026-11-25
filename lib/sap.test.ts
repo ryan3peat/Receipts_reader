@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   classifyLine,
+  entertainmentFbtSplits,
   gstLines,
   matchStatementLines,
   missingPurchases,
@@ -24,6 +25,50 @@ describe("gstLines", () => {
     expect(gstLines(15945, 1300)).toEqual([
       { gstCode: "P1", amountCents: 13000 },
       { gstCode: "P2", amountCents: 1645, note: "Split because the receipt includes a GST-free component" },
+    ])
+  })
+})
+
+describe("entertainmentFbtSplits", () => {
+  it("splits the Coffee Club sample 50-50 across 2210 and 2211 with half GST", () => {
+    // $52.89 total, $4.77 GST, $0.39 GST-free service charge.
+    // SAP Amount is after GST: 2210 $26.45 P2; 2211 $23.80 P1 + $0.26 P2.
+    expect(entertainmentFbtSplits(5289, 477)).toEqual([
+      {
+        glCode: "2210",
+        gstCode: "P2",
+        amountCents: 2645,
+        note: "FBT 50-50: non-deductible half (no GST claim)",
+      },
+      {
+        glCode: "2211",
+        gstCode: "P1",
+        amountCents: 2380,
+        note: "FBT 50-50: deductible half (GST claimable)",
+      },
+      {
+        glCode: "2211",
+        gstCode: "P2",
+        amountCents: 26,
+        note: "FBT 50-50: deductible half (GST-free component)",
+      },
+    ])
+  })
+
+  it("puts a fully taxable entertainment receipt half on 2210 P2 and half on 2211 P1", () => {
+    expect(entertainmentFbtSplits(11000, 1000)).toEqual([
+      {
+        glCode: "2210",
+        gstCode: "P2",
+        amountCents: 5500,
+        note: "FBT 50-50: non-deductible half (no GST claim)",
+      },
+      {
+        glCode: "2211",
+        gstCode: "P1",
+        amountCents: 5000,
+        note: "FBT 50-50: deductible half (GST claimable)",
+      },
     ])
   })
 })
@@ -167,6 +212,49 @@ describe("matchStatementLines", () => {
     expect(rows[0].missing).toBe(true)
     expect(rows[0].description).toBe("MISSING RECEIPT")
     expect(rows[0].dimension).toBe("ANNMAD")
+  })
+
+  it("expands 2210 or 2211 entertainment receipts into FBT 50-50 SAP rows", () => {
+    const catalog = {
+      categories: new Map([
+        ["2210", "Entertainment - Non Deductible"],
+        ["2211", "Entertainment - Deductible"],
+      ]),
+      projects: new Map<string, string>(),
+      dimension: "ANNMAD",
+    }
+    const receipt: SapReceipt = {
+      id: "coffee",
+      issuedOn: "2026-09-10",
+      totalCents: 5289,
+      convertedTotalCents: null,
+      vatCents: 477,
+      merchant: "The Coffee Club",
+      name: "Meal with clients",
+      description: null,
+      categoryCode: "2210",
+      projectCode: null,
+    }
+    const rows = sapRowsForStatement(
+      [
+        {
+          id: "s-coffee",
+          postedOn: "2026-09-10",
+          narrative: "THE COFFEE CLUB CREDIT CARD PURCHASE",
+          amountCents: 5289,
+          kind: "purchase",
+        },
+      ],
+      [receipt],
+      catalog
+    )
+    expect(rows.map((row) => [row.glCode, row.gstCode, row.amountCents])).toEqual([
+      ["2210", "P2", 2645],
+      ["2211", "P1", 2380],
+      ["2211", "P2", 26],
+    ])
+    expect(rows[0].glName).toBe("Entertainment - Non Deductible")
+    expect(rows[1].glName).toBe("Entertainment - Deductible")
   })
 })
 

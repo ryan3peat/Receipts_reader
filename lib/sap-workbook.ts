@@ -21,7 +21,8 @@ function writeHeader(sheet: ExcelJS.Worksheet, accountName: string, accountNumbe
   sheet.getCell("E3").value = "Accounts Input"
   sheet.getCell("C4").value = "Filled from the receipt"
   sheet.getCell("D4").value = "GL code from the Essential chart. Add the department suffix in SAP if this export does not include one."
-  sheet.getCell("G4").value = "P1 = 10% GST. P2 = no GST. A second line is added when one receipt has both."
+  sheet.getCell("G4").value =
+    "P1 = 10% GST. P2 = no GST. Mixed receipts add a second line. Entertainment 2210/2211 is split 50-50 for FBT."
   sheet.getCell("H4").value = "Amount after GST"
   sheet.getCell("I4").value = "Employee code"
   sheet.getRow(4).alignment = { wrapText: true, vertical: "top" }
