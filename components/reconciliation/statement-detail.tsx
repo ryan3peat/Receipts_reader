@@ -8,7 +8,6 @@ import {
   groupLevel,
   levelFor,
   monthLabel,
-  neededForGreen,
   type Group,
   type Thresholds,
 } from "@/lib/reconciliation"
@@ -53,7 +52,6 @@ export function StatementDetail({
   const missing = ready ? ready.missing : group.missing
   const level = levelFor(purchases, missing, thresholds)
   const percent = completionPercent(purchases, missing)
-  const needed = neededForGreen(purchases, missing, thresholds)
   const filter = choice ?? (missing > 0 ? "missing" : "all")
   const lines = ready ? (filter === "missing" ? ready.lines.filter((line) => !line.hasReceipt) : ready.lines) : []
   const multiple = group.statementIds.length > 1
@@ -88,27 +86,19 @@ export function StatementDetail({
 
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
-          {group.statementIds.map((id, index) =>
-            level === "green" ? (
-              <Button key={id} asChild>
-                {/* A plain link: the route builds the workbook, so it must not be prefetched. */}
-                <a href={`/sap/${id}`}>{multiple ? `Export for SAP, ${cardEnding(group.cards[index]) || `statement ${index + 1}`}` : "Export for SAP"}</a>
-              </Button>
-            ) : (
-              <Button key={id} disabled>
+          {group.statementIds.map((id, index) => (
+            <Button key={id} asChild>
+              {/* A plain link: the route builds the workbook, so it must not be prefetched. */}
+              <a href={`/sap/${id}`}>
                 {multiple ? `Export for SAP, ${cardEnding(group.cards[index]) || `statement ${index + 1}`}` : "Export for SAP"}
-              </Button>
-            )
-          )}
+              </a>
+            </Button>
+          ))}
         </div>
         <p className="text-sm text-muted-foreground">
-          {level === "green"
-            ? missing === 0
-              ? "All receipts are attached."
-              : `Ready to export. ${missing} unmatched purchase${missing === 1 ? "" : "s"} will be highlighted in the sheet.`
-            : thresholds.greenAbove >= 100
-              ? `Export is locked: all ${missing} missing receipt${missing === 1 ? "" : "s"} are needed.`
-              : `Export is locked: ${needed} more receipt${needed === 1 ? "" : "s"} needed to get over ${thresholds.greenAbove}%.`}
+          {missing === 0
+            ? "All receipts are attached."
+            : `${missing} unmatched purchase${missing === 1 ? "" : "s"} will be highlighted in the sheet. Export is unlocked for testing.`}
         </p>
       </div>
 

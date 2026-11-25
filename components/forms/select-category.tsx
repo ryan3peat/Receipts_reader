@@ -38,6 +38,8 @@ export const FormSelectCategory = ({
       placeholder={placeholder}
       hideIfEmpty={hideIfEmpty}
       isRequired={isRequired}
+      searchable
+      searchPlaceholder="Search GL code or name..."
       {...props}
     />
   )

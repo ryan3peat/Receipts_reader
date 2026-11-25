@@ -8,6 +8,7 @@ import { FormSelectCategory } from "@/components/forms/select-category"
 import { FormSelectCurrency } from "@/components/forms/select-currency"
 import { FormSelectProject } from "@/components/forms/select-project"
 import { FormSelectType } from "@/components/forms/select-type"
+import { NetAmountAfterGst } from "@/components/forms/net-amount-after-gst"
 import { FormInput, FormTextarea } from "@/components/forms/simple"
 import { Button } from "@/components/ui/button"
 import { isFieldShownInForm } from "@/lib/field-validation"
@@ -124,7 +125,11 @@ export default function TransactionEditForm({
           type="number"
           step="0.01"
           name="total"
-          defaultValue={formData.total.toFixed(2)}
+          value={formData.total || ""}
+          onChange={(e) => {
+            const next = parseFloat(e.target.value || "0")
+            if (!Number.isNaN(next)) setFormData({ ...formData, total: next })
+          }}
           className="w-32"
           isRequired={fieldMap.total.isRequired}
         />
@@ -154,6 +159,12 @@ export default function TransactionEditForm({
         ) : (
           <input type="hidden" name="type" value={formData.type} />
         )}
+
+        <NetAmountAfterGst
+          total={formData.total}
+          vat={formData.vat as string | number}
+          vatRate={formData.vat_rate as string | number}
+        />
       </div>
 
       <div className="flex flex-row flex-grow gap-4">
@@ -252,7 +263,8 @@ export default function TransactionEditForm({
               type="text"
               title={field.name}
               name={field.code}
-              defaultValue={(formData[field.code as keyof typeof formData] as string) || ""}
+              value={(formData[field.code as keyof typeof formData] as string) || ""}
+              onChange={(e) => setFormData({ ...formData, [field.code]: e.target.value })}
               isRequired={field.isRequired}
               className={field.type === "number" ? "max-w-36" : "max-w-full"}
             />

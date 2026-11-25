@@ -100,6 +100,8 @@ export const FormSelect = ({
   placeholder,
   hideIfEmpty = false,
   isRequired = false,
+  searchable = false,
+  searchPlaceholder = "Search...",
   onValueChange,
   name,
   id,
@@ -111,18 +113,25 @@ export const FormSelect = ({
   placeholder?: string
   hideIfEmpty?: boolean
   isRequired?: boolean
+  searchable?: boolean
+  searchPlaceholder?: string
   name?: string
   id?: string
 } & SelectProps) => {
   const [internalValue, setInternalValue] = useState<string | undefined>(
     (props.value as string | undefined) || (props.defaultValue as string | undefined)
   )
+  const [query, setQuery] = useState("")
   const isControlled = props.value !== undefined
   const selectValue = (isControlled ? (props.value as string | undefined) : internalValue) || ""
   const isEmpty = !selectValue || selectValue.toString().trim() === ""
 
   const labelId = title ? `${id || name || "select"}-label` : undefined
   const controlId = id || name
+  const needle = query.trim().toLowerCase()
+  const visibleItems = searchable && needle
+    ? items.filter((item) => item.code.toLowerCase().includes(needle) || item.name.toLowerCase().includes(needle))
+    : items
 
   const handleChange = (v: string) => {
     if (!isControlled) setInternalValue(v)
@@ -146,6 +155,10 @@ export const FormSelect = ({
         {...props}
         required={isRequired}
         onValueChange={handleChange}
+        onOpenChange={(open) => {
+          if (!open) setQuery("")
+          props.onOpenChange?.(open)
+        }}
         {...(isControlled ? { value: props.value as string } : { defaultValue: props.defaultValue as string })}
       >
         <SelectTrigger
@@ -157,19 +170,35 @@ export const FormSelect = ({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
+          {searchable && (
+            <div className="sticky top-0 z-10 bg-popover p-2 border-b">
+              <Input
+                value={query}
+                placeholder={searchPlaceholder}
+                className="h-8 bg-background"
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
           {emptyValue && <SelectItem value="-">{emptyValue}</SelectItem>}
-          {items.map((item) => (
-            <SelectItem key={item.code} value={item.code}>
-              <div className="flex items-center gap-2 text-base pr-2">
-                {item.logo && <Image src={item.logo} alt={item.name} width={20} height={20} className="rounded-full" />}
-                {item.badge && <Badge className="px-2">{item.badge}</Badge>}
-                {!item.badge && item.color && (
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                )}
-                {item.name}
-              </div>
-            </SelectItem>
-          ))}
+          {visibleItems.length === 0 ? (
+            <div className="px-2 py-3 text-sm text-muted-foreground">No matching GL codes</div>
+          ) : (
+            visibleItems.map((item) => (
+              <SelectItem key={item.code} value={item.code}>
+                <div className="flex items-center gap-2 text-base pr-2">
+                  {item.logo && <Image src={item.logo} alt={item.name} width={20} height={20} className="rounded-full" />}
+                  {item.badge && <Badge className="px-2">{item.badge}</Badge>}
+                  {!item.badge && item.color && (
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  )}
+                  {item.name}
+                </div>
+              </SelectItem>
+            ))
+          )}
         </SelectContent>
       </Select>
     </span>

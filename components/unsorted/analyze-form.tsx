@@ -11,6 +11,7 @@ import { FormSelectCategory } from "@/components/forms/select-category"
 import { FormSelectCurrency } from "@/components/forms/select-currency"
 import { FormSelectProject } from "@/components/forms/select-project"
 import { FormSelectType } from "@/components/forms/select-type"
+import { NetAmountAfterGst } from "@/components/forms/net-amount-after-gst"
 import { FormInput, FormTextarea } from "@/components/forms/simple"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -371,6 +372,8 @@ export default function AnalyzeForm({
           ) : (
             <input type="hidden" name="type" value={formData.type} />
           )}
+
+          <NetAmountAfterGst total={formData.total} vat={formData.vat as string | number} vatRate={formData.vat_rate as string | number} />
         </div>
 
         {formData.total != 0 && formData.currencyCode && formData.currencyCode !== settings.default_currency && (
