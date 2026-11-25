@@ -194,6 +194,54 @@ describe("matchStatementLines", () => {
     expect(matches[0].receipt?.id).toBe("fx2")
   })
 
+  it("does not match a Grok receipt to an unrelated subscription on a nearby amount", () => {
+    const grok: SapReceipt = {
+      id: "grok",
+      issuedOn: "2026-09-17",
+      totalCents: 10000,
+      convertedTotalCents: 14013,
+      vatCents: 0,
+      merchant: "Grok xAI",
+      name: "SuperGrok Plus subscription",
+      description: "Monthly SuperGrok Plus subscription for September 17 to October 17, 2026.",
+      categoryCode: "2065",
+      projectCode: null,
+    }
+    const matches = matchStatementLines(
+      [
+        { id: "pulse", postedOn: "2026-09-14", narrative: "PULSEWAY SUBSCRIPTION DUBLIN (96.90 US dollar)", amountCents: 13560, kind: "purchase" },
+        { id: "xai", postedOn: "2026-09-17", narrative: "GROK XAI WWW.GROK.COM CA", amountCents: 14613, kind: "purchase" },
+      ],
+      [grok]
+    )
+    expect(matches.find((match) => match.line.id === "pulse")?.receipt).toBeNull()
+    expect(matches.find((match) => match.line.id === "xai")?.receipt?.id).toBe("grok")
+  })
+
+  it("gives a receipt to the line it fits best, not the first line in statement order", () => {
+    const hdmi: SapReceipt = {
+      id: "hdmi",
+      issuedOn: "2026-09-16",
+      totalCents: 6899,
+      convertedTotalCents: null,
+      vatCents: 0,
+      merchant: "ZZLINKING",
+      name: "Twozoh 2 m HDMI cables, 10-pack",
+      description: "Purchase of a 10-pack of slim HDMI 2.0 cables. Order 503-4201088-0998231, paid by Visa ending in 0577.",
+      categoryCode: "2047",
+      projectCode: null,
+    }
+    const matches = matchStatementLines(
+      [
+        { id: "scorpion", postedOn: "2026-09-09", narrative: "SCORPION TECHNOLOGY CO CLAYTON", amountCents: 6900, kind: "purchase" },
+        { id: "amazon", postedOn: "2026-09-17", narrative: "AMAZON MARKETPLACE AU SYDNEY", amountCents: 6899, kind: "purchase" },
+      ],
+      [hdmi]
+    )
+    expect(matches.find((match) => match.line.id === "amazon")?.receipt?.id).toBe("hdmi")
+    expect(matches.find((match) => match.line.id === "scorpion")?.receipt).toBeNull()
+  })
+
   it("highlights the unmatched purchase on the FOR SAP rows", () => {
     const rows = sapRowsForStatement(
       [

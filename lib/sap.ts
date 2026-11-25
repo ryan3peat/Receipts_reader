@@ -582,10 +582,25 @@ function amountGapToLine(receipt: SapReceipt, lineAmountCents: number): number |
   return Math.min(...amounts.map((amount) => Math.abs(amount - lineAmountCents)))
 }
 
+// Generic receipt words that appear on many unrelated bank narratives. They must not count as a merchant match.
+const GENERIC_TOKENS = new Set([
+  "subscription", "monthly", "annual", "plus", "pack", "purchase", "payment", "invoice", "receipt", "order",
+  "paid", "visa", "mastercard", "ending", "card", "credit", "debit", "total", "amount", "service", "services",
+  "online", "account", "billing", "charge", "charged", "with", "from", "that", "this", "have", "pty", "ltd",
+  "com", "www", "australia", "sydney", "melbourne", "digital", "supporting", "january", "february", "march",
+  "april", "may", "june", "july", "august", "september", "october", "november", "december", "due", "date",
+])
+
 /** Words from merchant/name/description that can appear on a bank narrative. */
 export function receiptNarrativeTokens(receipt: SapReceipt): string[] {
   const text = [receipt.merchant, receipt.name, receipt.description].filter(Boolean).join(" ").toLowerCase()
-  return text.split(/[^a-z0-9]+/).filter((token) => token.length > 3)
+  return [
+    ...new Set(
+      text
+        .split(/[^a-z0-9]+/)
+        .filter((token) => token.length > 3 && /[a-z]/.test(token) && !GENERIC_TOKENS.has(token))
+    ),
+  ]
 }
 
 function tokenHits(receipt: SapReceipt, narrative: string): number {
@@ -599,12 +614,12 @@ function tokenHits(receipt: SapReceipt, narrative: string): number {
  * merchant/name shows up in the narrative and the amount is within 15% or $25.
  */
 export function matchStatementLines(lines: StatementPurchase[], receipts: SapReceipt[]): StatementMatch[] {
-  const used = new Set<string>()
-  return lines.map((line) => {
-    if (line.kind !== "purchase") return { line, receipt: null }
-    let best: { receipt: SapReceipt; score: number } | null = null
+  // Score every eligible (line, receipt) pair first, then assign globally from best score down.
+  // Assigning in statement order let an early line take a receipt that fits a later line much better.
+  const pairs: { lineIndex: number; receipt: SapReceipt; score: number }[] = []
+  lines.forEach((line, lineIndex) => {
+    if (line.kind !== "purchase") return
     for (const receipt of receipts) {
-      if (used.has(receipt.id)) continue
       const amountGap = amountGapToLine(receipt, line.amountCents)
       if (amountGap === null) continue
       const dayGap = daysApart(line.postedOn, receipt.issuedOn)
@@ -615,11 +630,21 @@ export function matchStatementLines(lines: StatementPurchase[], receipts: SapRec
         hits >= 1 && (amountGap <= 2500 || amountGap / Math.max(line.amountCents, 1) <= 0.15)
       if (!tight && !fxSoft) continue
       const score = amountGap + dayGap * 20 - hits * 30
-      if (!best || score < best.score) best = { receipt, score }
+      pairs.push({ lineIndex, receipt, score })
     }
-    if (best) used.add(best.receipt.id)
-    return { line, receipt: best?.receipt ?? null }
   })
+  pairs.sort((a, b) => a.score - b.score)
+
+  const usedLines = new Set<number>()
+  const usedReceipts = new Set<string>()
+  const assigned = new Map<number, SapReceipt>()
+  for (const pair of pairs) {
+    if (usedLines.has(pair.lineIndex) || usedReceipts.has(pair.receipt.id)) continue
+    usedLines.add(pair.lineIndex)
+    usedReceipts.add(pair.receipt.id)
+    assigned.set(pair.lineIndex, pair.receipt)
+  }
+  return lines.map((line, lineIndex) => ({ line, receipt: assigned.get(lineIndex) ?? null }))
 }
 
 type Catalog = {

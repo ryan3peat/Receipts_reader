@@ -183,6 +183,19 @@ export async function rematchStatement(statementId: string, userId: string) {
   })
 }
 
+/** Rematch every statement for a cardholder after a receipt is saved or edited. */
+export async function rematchStatementsForEmployee(userId: string, employeeId: string) {
+  const statements = await prisma.cardStatement.findMany({
+    where: { userId, employeeId },
+    select: { id: true },
+    orderBy: { createdAt: "desc" },
+  })
+  for (const statement of statements) {
+    await rematchStatement(statement.id, userId)
+  }
+  return statements.length
+}
+
 export async function rowsForStatement(statementId: string, userId: string) {
   const statement = await rematchStatement(statementId, userId)
   if (!statement) return null

@@ -14,6 +14,7 @@ import {
   writeBytesIfPossible,
 } from "@/lib/files"
 import { createFile, deleteFile, getFileById, readFileBytes, updateFile } from "@/models/files"
+import { scheduleRematchForTransaction } from "@/lib/schedule-rematch"
 import {
   createTransaction,
   TransactionData,
@@ -98,8 +99,15 @@ export async function saveFileAsTransactionAction(
 
     await updateTransactionFiles(transaction.id, user.id, [file.id])
 
+    // Tag keeps ownership on the uploader; rematch their statements in the background.
+    scheduleRematchForTransaction(user.id, {
+      submittedById: transaction.submittedById,
+      fileIds: [file.id],
+    })
+
     revalidatePath("/unsorted")
     revalidatePath("/transactions")
+    revalidatePath("/sap")
 
     return { success: true, data: transaction }
   } catch (error) {

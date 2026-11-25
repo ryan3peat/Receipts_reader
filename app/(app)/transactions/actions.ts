@@ -5,6 +5,7 @@ import { requireAccounts } from "@/lib/access"
 import { ActionState } from "@/lib/actions"
 import { getCurrentUser, isSubscriptionExpired } from "@/lib/auth"
 import { missingRequiredFormFieldNames } from "@/lib/field-validation"
+import { scheduleRematchForTransaction } from "@/lib/schedule-rematch"
 import { isManualTransactionStatus } from "@/lib/transaction-status"
 import {
   getDirectorySize,
@@ -70,7 +71,13 @@ export async function createTransactionAction(
 
     const newTransaction = await createTransaction(user.id, transactionData)
 
+    scheduleRematchForTransaction(user.id, {
+      submittedById: newTransaction.submittedById,
+      fileIds: Array.isArray(newTransaction.files) ? (newTransaction.files as string[]) : [],
+    })
+
     revalidatePath("/transactions")
+    revalidatePath("/sap")
     return { success: true, data: newTransaction }
   } catch (error) {
     console.error("Failed to create transaction:", error)
@@ -98,7 +105,13 @@ export async function saveTransactionAction(
 
     const transaction = await updateTransaction(transactionId, user.id, validatedForm.data)
 
+    scheduleRematchForTransaction(user.id, {
+      submittedById: transaction.submittedById,
+      fileIds: Array.isArray(transaction.files) ? (transaction.files as string[]) : [],
+    })
+
     revalidatePath("/transactions")
+    revalidatePath("/sap")
     return { success: true, data: transaction }
   } catch (error) {
     console.error("Failed to update transaction:", error)
