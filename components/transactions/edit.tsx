@@ -162,8 +162,8 @@ export default function TransactionEditForm({
 
         <NetAmountAfterGst
           total={formData.total}
-          vat={formData.vat as string | number}
-          vatRate={formData.vat_rate as string | number}
+          vat={(formData as Record<string, unknown>).vat as string | number}
+          vatRate={(formData as Record<string, unknown>).vat_rate as string | number}
         />
       </div>
 

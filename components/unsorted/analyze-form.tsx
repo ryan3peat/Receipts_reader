@@ -373,7 +373,11 @@ export default function AnalyzeForm({
             <input type="hidden" name="type" value={formData.type} />
           )}
 
-          <NetAmountAfterGst total={formData.total} vat={formData.vat as string | number} vatRate={formData.vat_rate as string | number} />
+          <NetAmountAfterGst
+            total={formData.total}
+            vat={(formData as Record<string, unknown>).vat as string | number}
+            vatRate={(formData as Record<string, unknown>).vat_rate as string | number}
+          />
         </div>
 
         {formData.total != 0 && formData.currencyCode && formData.currencyCode !== settings.default_currency && (
