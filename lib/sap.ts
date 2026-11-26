@@ -9,7 +9,9 @@ export type GstLine = {
 export type SapReceipt = {
   id: string
   issuedOn: string | null
+  /** Total in the receipt's own currency (see currencyCode). */
   totalCents: number | null
+  currencyCode?: string | null
   /** Card/statement currency total when the receipt was in a foreign currency. */
   convertedTotalCents: number | null
   vatCents: number
@@ -608,6 +610,46 @@ function tokenHits(receipt: SapReceipt, narrative: string): number {
   return receiptNarrativeTokens(receipt).filter((token) => lower.includes(token)).length
 }
 
+// Currency names the bank prints in brackets on foreign charges, e.g. "(96.90 US dollar)".
+const CURRENCY_NAMES: Record<string, string> = {
+  "us dollar": "USD",
+  "usd": "USD",
+  "euro": "EUR",
+  "british pound": "GBP",
+  "pound sterling": "GBP",
+  "singapore dollar": "SGD",
+  "hong kong dollar": "HKD",
+  "new zealand dollar": "NZD",
+  "canadian dollar": "CAD",
+  "japanese yen": "JPY",
+  "swiss franc": "CHF",
+  "vietnamese dong": "VND",
+  "dong": "VND",
+  "indian rupee": "INR",
+  "thai baht": "THB",
+  "malaysian ringgit": "MYR",
+  "chinese yuan": "CNY",
+}
+
+/** The foreign amount printed on a statement line, e.g. "(96.90 US dollar)" or "(162,205 Dong)". */
+export function foreignAmountOnNarrative(narrative: string): { cents: number; currencyCode: string } | null {
+  const match = narrative.match(/\(([\d,]+(?:\.\d+)?)\s+([A-Za-z][A-Za-z ]*?)\)\s*$/)
+  if (!match) return null
+  const currencyCode = CURRENCY_NAMES[match[2].trim().toLowerCase()]
+  if (!currencyCode) return null
+  const value = parseFloat(match[1].replace(/,/g, ""))
+  if (!Number.isFinite(value) || value <= 0) return null
+  return { cents: Math.round(value * 100), currencyCode }
+}
+
+/** True when the receipt's own-currency total equals the foreign amount printed on the statement line. */
+function foreignAmountMatches(receipt: SapReceipt, narrative: string): boolean {
+  const foreign = foreignAmountOnNarrative(narrative)
+  if (!foreign || receipt.totalCents == null || !receipt.currencyCode) return false
+  if (receipt.currencyCode.toUpperCase() !== foreign.currencyCode) return false
+  return Math.abs(receipt.totalCents - foreign.cents) <= Math.max(100, foreign.cents * 0.01)
+}
+
 /**
  * Match statement purchases to receipts for one cardholder.
  * Exact/near amount (±$1 or 2%) is preferred. FX and similar cases can still match when the
@@ -628,8 +670,10 @@ export function matchStatementLines(lines: StatementPurchase[], receipts: SapRec
       const tight = amountGap <= 100 || amountGap / Math.max(line.amountCents, 1) <= 0.02
       const fxSoft =
         hits >= 1 && (amountGap <= 2500 || amountGap / Math.max(line.amountCents, 1) <= 0.15)
-      if (!tight && !fxSoft) continue
-      const score = amountGap + dayGap * 20 - hits * 30
+      // Same foreign amount and currency as the bank printed: strongest signal, even when the AUD gap is large.
+      const foreignExact = foreignAmountMatches(receipt, line.narrative)
+      if (!tight && !fxSoft && !foreignExact) continue
+      const score = foreignExact ? dayGap * 20 - 10000 : amountGap + dayGap * 20 - hits * 30
       pairs.push({ lineIndex, receipt, score })
     }
   })

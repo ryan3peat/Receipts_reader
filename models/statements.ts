@@ -23,6 +23,7 @@ export function toSapReceipt(transaction: {
   id: string
   issuedAt: Date | null
   total: number | null
+  currencyCode?: string | null
   convertedTotal?: number | null
   extra: unknown
   merchant: string | null
@@ -35,6 +36,7 @@ export function toSapReceipt(transaction: {
     id: transaction.id,
     issuedOn: dayOf(transaction.issuedAt),
     totalCents: transaction.total,
+    currencyCode: transaction.currencyCode ?? null,
     convertedTotalCents: transaction.convertedTotal ?? null,
     vatCents: resolveVatCents(transaction.total, transaction.extra),
     merchant: transaction.merchant,

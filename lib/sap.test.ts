@@ -242,6 +242,31 @@ describe("matchStatementLines", () => {
     expect(matches.find((match) => match.line.id === "scorpion")?.receipt).toBeNull()
   })
 
+  it("matches on the foreign amount printed on the statement when the AUD gap is large", () => {
+    const pulseway: SapReceipt = {
+      id: "pulseway",
+      issuedOn: "2026-09-14",
+      totalCents: 9690,
+      currencyCode: "USD",
+      convertedTotalCents: 11000,
+      vatCents: 0,
+      merchant: "Pulseway",
+      name: "Pulseway monthly subscription",
+      description: null,
+      categoryCode: "2065",
+      projectCode: null,
+    }
+    const line = {
+      id: "pw",
+      postedOn: "2026-09-14",
+      narrative: "PULSEWAY SUBSCRIPTION DUBLIN (96.90 US dollar)",
+      amountCents: 13560,
+      kind: "purchase" as const,
+    }
+    expect(matchStatementLines([line], [pulseway])[0].receipt?.id).toBe("pulseway")
+    expect(matchStatementLines([line], [{ ...pulseway, currencyCode: "EUR" }])[0].receipt).toBeNull()
+  })
+
   it("highlights the unmatched purchase on the FOR SAP rows", () => {
     const rows = sapRowsForStatement(
       [
