@@ -178,9 +178,14 @@ export const standardFieldRenderers: Record<string, FieldRenderer> = {
     code: "documentKind",
     classes: "whitespace-nowrap",
     sortable: false,
-    formatValue: (transaction: Transaction) => (
-      <DocumentKindTag value={transaction.extra?.documentKind} />
-    ),
+    formatValue: (transaction: Transaction) => {
+      const extra = transaction.extra
+      const value =
+        extra && typeof extra === "object" && !Array.isArray(extra)
+          ? (extra as Record<string, unknown>).documentKind
+          : undefined
+      return <DocumentKindTag value={value} />
+    },
   },
   netAmountAfterGst: {
     name: "Net Amount after GST",
