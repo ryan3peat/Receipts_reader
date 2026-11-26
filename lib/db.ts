@@ -6,14 +6,15 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
+  // A few sockets let page loads run auth + list queries in parallel. Keep this low for serverless.
   const adapter = new PrismaPg({
     connectionString: process.env.DATABASE_URL,
-    max: 1,
+    max: 5,
     min: 0,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
   })
-  return new PrismaClient({ adapter, log: ["query", "info", "warn", "error"] })
+  return new PrismaClient({ adapter, log: ["warn", "error"] })
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()

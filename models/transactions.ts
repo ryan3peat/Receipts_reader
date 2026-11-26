@@ -137,31 +137,59 @@ export const getTransactions = cache(
     await scopeTransactionWhere(where)
 
     if (pagination) {
-      const total = await prisma.transaction.count({ where })
-      const transactions = await prisma.transaction.findMany({
-        where,
-        include: {
-          category: true,
-          project: true,
-          submittedBy: true,
-        },
-        orderBy,
-        take: pagination?.limit,
-        skip: pagination?.offset,
-      })
-      return { transactions, total }
-    } else {
-      const transactions = await prisma.transaction.findMany({
-        where,
-        include: {
-          category: true,
-          project: true,
-          submittedBy: true,
-        },
-        orderBy,
-      })
-      return { transactions, total: transactions.length }
+      // Page list never needs OCR text, line items, or full user rows.
+      const select = {
+        id: true,
+        userId: true,
+        submittedById: true,
+        name: true,
+        description: true,
+        merchant: true,
+        total: true,
+        currencyCode: true,
+        convertedTotal: true,
+        convertedCurrencyCode: true,
+        type: true,
+        status: true,
+        note: true,
+        files: true,
+        extra: true,
+        categoryCode: true,
+        projectCode: true,
+        issuedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        glFieldKey: true,
+        departmentSplits: true,
+        category: { select: { code: true, name: true, color: true } },
+        project: { select: { code: true, name: true, color: true } },
+        submittedBy: { select: { id: true, name: true, email: true } },
+      } satisfies Prisma.TransactionSelect
+
+      const [total, transactions] = await Promise.all([
+        prisma.transaction.count({ where }),
+        prisma.transaction.findMany({
+          where,
+          select,
+          orderBy,
+          take: pagination.limit,
+          skip: pagination.offset,
+        }),
+      ])
+      return { transactions: transactions as unknown as Transaction[], total }
     }
+
+    // Full rows for export and other non-paginated callers.
+    const transactions = await prisma.transaction.findMany({
+      where,
+      include: {
+        category: true,
+        project: true,
+        submittedBy: { select: { id: true, name: true, email: true } },
+      },
+      orderBy,
+    })
+    return { transactions: transactions as unknown as Transaction[], total: transactions.length }
   }
 )
 

@@ -127,7 +127,7 @@ export function AppSidebar({
 
                 <SidebarMenuItemWithHighlight href="/transactions">
                   <SidebarMenuButton asChild>
-                    <Link href="/transactions" onClick={closeMobile}>
+                    <Link href="/transactions" prefetch onClick={closeMobile}>
                       <FileText />
                       <span>Transactions</span>
                       {notification && notification.code === "sidebar.transactions" && notification.message && (

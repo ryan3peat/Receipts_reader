@@ -93,16 +93,22 @@ export async function ensureDefaultFields(userId: string) {
     })
   }
 
-  // Document kind was added as detect-and-show. Make sure existing accounts get the visible tag field.
-  await prisma.field.updateMany({
+  // Only rewrite documentKind when an older install still has the hidden defaults.
+  const documentKind = await prisma.field.findFirst({
     where: { userId, code: "documentKind" },
-    data: {
-      name: "Document",
-      isVisibleInList: true,
-      isVisibleInAnalysis: true,
-      isExtra: true,
-      llm_prompt:
-        "What this document is. Return exactly one of: invoice, receipt, payment_confirmation. Use invoice for a tax invoice. Use receipt for a till or purchase receipt. Use payment_confirmation for a payment or bank confirmation that is not a tax invoice.",
-    },
+    select: { isVisibleInList: true, isVisibleInAnalysis: true },
   })
+  if (documentKind && (!documentKind.isVisibleInList || !documentKind.isVisibleInAnalysis)) {
+    await prisma.field.updateMany({
+      where: { userId, code: "documentKind" },
+      data: {
+        name: "Document",
+        isVisibleInList: true,
+        isVisibleInAnalysis: true,
+        isExtra: true,
+        llm_prompt:
+          "What this document is. Return exactly one of: invoice, receipt, payment_confirmation. Use invoice for a tax invoice. Use receipt for a till or purchase receipt. Use payment_confirmation for a payment or bank confirmation that is not a tax invoice.",
+      },
+    })
+  }
 }
