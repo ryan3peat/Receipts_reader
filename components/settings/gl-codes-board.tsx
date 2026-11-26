@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 export type BoardField = {
   id: string
@@ -52,15 +52,31 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "unassigned" | "combined">("all")
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [drag, setDrag] = useState<Drag | null>(null)
+  // Local board state updates instantly; department saves go to the server in the background.
+  const [fields, setFields] = useState(data.fields)
+  const dragRef = useRef<Drag | null>(null)
+  const pendingSaves = useRef(0)
 
-  const fieldById = useMemo(() => new Map(data.fields.map((field) => [field.id, field])), [data.fields])
+  useEffect(() => {
+    if (pendingSaves.current === 0) setFields(data.fields)
+  }, [data.fields])
+
+  const fieldById = useMemo(() => new Map(fields.map((field) => [field.id, field])), [fields])
   const nameOf = useMemo(() => new Map(data.nrCodes.map((nr) => [nr.code, nr.name])), [data.nrCodes])
   const efiFor = useMemo(() => {
     const map = new Map<string, BoardData["efi"][number]>()
     for (const efi of data.efi) if (efi.nrCode) map.set(`${efi.nrCode}|${efi.departmentId}`, efi)
     return map
   }, [data.efi])
+
+  function beginDrag(next: Drag) {
+    // Ref is set synchronously so dragOver/drop see it before React re-renders.
+    dragRef.current = next
+  }
+
+  function endDrag() {
+    dragRef.current = null
+  }
 
   function run(work: () => Promise<{ success: boolean; error?: string }>, done?: string) {
     setMessage(null)
@@ -70,6 +86,36 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
       else if (done) setMessage({ kind: "info", text: done })
       router.refresh()
     })
+  }
+
+  /** Instant UI update, then save in the background. On failure, refresh from the server. */
+  function patchDepartments(fieldIds: string[], addIds: string[], removeIds: string[]) {
+    if (fieldIds.length === 0) return
+    setMessage(null)
+    setFields((current) =>
+      current.map((field) => {
+        if (!fieldIds.includes(field.id)) return field
+        let next = field.departmentIds.filter((id) => !removeIds.includes(id))
+        for (const id of addIds) if (!next.includes(id)) next = [...next, id]
+        return next === field.departmentIds ? field : { ...field, departmentIds: next }
+      })
+    )
+    pendingSaves.current += 1
+    void setFieldDepartmentsAction(fieldIds, addIds, removeIds)
+      .then((result) => {
+        pendingSaves.current = Math.max(0, pendingSaves.current - 1)
+        if (!result.success) {
+          setMessage({ kind: "error", text: result.error ?? "Could not save. Reloading." })
+          router.refresh()
+          return
+        }
+        if (pendingSaves.current === 0) router.refresh()
+      })
+      .catch(() => {
+        pendingSaves.current = Math.max(0, pendingSaves.current - 1)
+        setMessage({ kind: "error", text: "Could not save. Reloading." })
+        router.refresh()
+      })
   }
 
   if (!hasDepartments) {
@@ -104,7 +150,7 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
     )
   }
 
-  const visible = data.fields
+  const visible = fields
     .filter((field) => {
       if (filter === "unassigned" && field.departmentIds.length > 0) return false
       if (filter === "combined" && !field.combined) return false
@@ -129,26 +175,26 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
   }
 
   function onPoolDrop() {
-    if (!drag || drag.origin === null) return
-    const origin = drag.origin
-    run(() => setFieldDepartmentsAction(drag.ids, [], [origin]), "Removed from department")
-    setDrag(null)
+    const current = dragRef.current
+    if (!current || current.origin === null) return
+    patchDepartments(current.ids, [], [current.origin])
+    endDrag()
   }
 
   function onLaneDrop(departmentId: string) {
-    if (!drag || drag.origin === departmentId) return
-    const origin = drag.origin
-    run(
-      () => setFieldDepartmentsAction(drag.ids, [departmentId], origin ? [origin] : []),
-      "Assigned to department"
-    )
-    setDrag(null)
+    const current = dragRef.current
+    if (!current || current.origin === departmentId) return
+    const origin = current.origin
+    // Moving between departments removes the old one; dragging from the pool only adds.
+    patchDepartments(current.ids, [departmentId], origin ? [origin] : [])
+    endDrag()
   }
 
   function onPoolCardDrop(targetId: string) {
-    if (!drag || drag.origin !== null) return
-    const ids = [...new Set([...drag.ids, targetId])]
-    setDrag(null)
+    const current = dragRef.current
+    if (!current || current.origin !== null) return
+    const ids = [...new Set([...current.ids, targetId])]
+    endDrag()
     openCombine(ids)
   }
 
@@ -230,7 +276,7 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
             <div
               className="flex max-h-[70vh] min-h-[320px] flex-col rounded-md border bg-muted/30"
               onDragOver={(event) => {
-                if (drag && drag.origin !== null) event.preventDefault()
+                if (dragRef.current && dragRef.current.origin !== null) event.preventDefault()
               }}
               onDrop={(event) => {
                 event.preventDefault()
@@ -240,7 +286,7 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
               <div className="flex items-center justify-between border-b px-3 py-2 text-sm font-medium">
                 <span>GL codes (NR)</span>
                 <span className="text-xs text-muted-foreground">
-                  {visible.length} of {data.fields.length}
+                  {visible.length} of {fields.length}
                 </span>
               </div>
               <div className="flex-1 space-y-2 overflow-y-auto p-2">
@@ -249,11 +295,12 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
                     key={field.id}
                     draggable
                     onDragStart={() =>
-                      setDrag({ ids: selected.has(field.id) ? [...selected] : [field.id], origin: null })
+                      beginDrag({ ids: selected.has(field.id) ? [...selected] : [field.id], origin: null })
                     }
-                    onDragEnd={() => setDrag(null)}
+                    onDragEnd={() => endDrag()}
                     onDragOver={(event) => {
-                      if (drag && drag.origin === null && !drag.ids.includes(field.id)) event.preventDefault()
+                      const current = dragRef.current
+                      if (current && current.origin === null && !current.ids.includes(field.id)) event.preventDefault()
                     }}
                     onDrop={(event) => {
                       event.preventDefault()
@@ -313,13 +360,14 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
 
             <div className="flex gap-3 overflow-x-auto pb-2">
               {data.departments.map((department, index) => {
-                const members = data.fields.filter((field) => field.departmentIds.includes(department.id))
+                const members = fields.filter((field) => field.departmentIds.includes(department.id))
                 const gaps = members.filter((field) => field.members.some((nr) => !efiFor.has(`${nr}|${department.id}`)))
                 return (
                   <div
                     key={department.id}
                     onDragOver={(event) => {
-                      if (drag && drag.origin !== department.id) event.preventDefault()
+                      const current = dragRef.current
+                      if (current && current.origin !== department.id) event.preventDefault()
                     }}
                     onDrop={(event) => {
                       event.preventDefault()
@@ -341,18 +389,21 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
                         <div
                           key={field.id}
                           draggable
-                          onDragStart={() => setDrag({ ids: [field.id], origin: department.id })}
-                          onDragEnd={() => setDrag(null)}
+                          onDragStart={() => beginDrag({ ids: [field.id], origin: department.id })}
+                          onDragEnd={() => endDrag()}
                           className="rounded-md border bg-muted/30 p-2 text-sm"
                         >
                           <div className="flex items-start justify-between gap-1">
                             <span className="font-medium leading-snug">{field.name}</span>
                             <button
+                              type="button"
                               className="text-muted-foreground hover:text-red-600"
                               title="Remove from this department"
-                              onClick={() =>
-                                run(() => setFieldDepartmentsAction([field.id], [], [department.id]), "Removed")
-                              }
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                patchDepartments([field.id], [], [department.id])
+                              }}
                             >
                               ×
                             </button>
