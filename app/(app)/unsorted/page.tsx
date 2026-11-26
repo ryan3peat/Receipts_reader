@@ -9,8 +9,8 @@ import AnalyzeForm from "@/components/unsorted/analyze-form"
 import { getActor, listMembers } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
-import { getCategories } from "@/models/categories"
 import { getCurrencies } from "@/models/currencies"
+import { glFormChoices } from "@/lib/gl-options"
 import { getFields } from "@/models/fields"
 import { getUnsortedFiles } from "@/models/files"
 import { getProjects } from "@/models/projects"
@@ -35,7 +35,8 @@ export default async function UnsortedPage({
   const employee =
     isAccounts && submittedById ? (await listMembers()).find((member) => member.id === submittedById) : undefined
   const files = await getUnsortedFiles(user.id, employee?.id)
-  const categories = await getCategories(user.id)
+  const { options, picker } = await glFormChoices(actor)
+  const categories = options.map((option) => ({ code: option.code, name: option.name, color: option.color }))
   const projects = await getProjects(user.id)
   const currencies = await getCurrencies(user.id)
   const fields = await getFields(user.id)
@@ -108,6 +109,7 @@ export default async function UnsortedPage({
               <AnalyzeForm
                 file={file}
                 categories={categories}
+                picker={picker}
                 projects={projects}
                 currencies={currencies}
                 fields={fields}

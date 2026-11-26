@@ -2,6 +2,7 @@
 
 import { readableFormError, transactionFormSchema } from "@/forms/transactions"
 import { ActionState } from "@/lib/actions"
+import { glPatchFromForm } from "@/lib/gl-submission"
 import { getCurrentUser } from "@/lib/auth"
 import { missingRequiredFormFieldNames } from "@/lib/field-validation"
 import { getFields } from "@/models/fields"
@@ -50,8 +51,11 @@ export async function saveFileAsTransactionAction(
     const file = await getFileById(fileId, user.id)
     if (!file) throw new Error("File not found")
 
+    const gl = await glPatchFromForm(formData, "create")
+    if (!gl.ok) return { success: false, error: gl.error }
+
     const forceSave = formData.get("forceSave") === "true"
-    const transactionData = validatedForm.data
+    const transactionData = { ...validatedForm.data, ...gl.patch }
 
     // --- Deduplication Check ---
     if (!forceSave) {
@@ -71,7 +75,7 @@ export async function saveFileAsTransactionAction(
     }
 
     // Keep ownership with whoever uploaded the receipt, even when Accounts reviews and saves it.
-    const transaction = await createTransaction(user.id, validatedForm.data, {
+    const transaction = await createTransaction(user.id, transactionData, {
       submittedById: file.submittedById || undefined,
     })
 

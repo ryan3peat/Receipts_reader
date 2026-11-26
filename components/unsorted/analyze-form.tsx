@@ -10,6 +10,8 @@ import { FormError } from "@/components/forms/error"
 import { FormSelectCategory } from "@/components/forms/select-category"
 import { FormSelectCurrency } from "@/components/forms/select-currency"
 import { FormSelectProject } from "@/components/forms/select-project"
+import { GlDepartmentPicker } from "@/components/transactions/gl-department-picker"
+import type { GlPicker } from "@/lib/gl-options"
 import { FormSelectType } from "@/components/forms/select-type"
 import { NetAmountAfterGst } from "@/components/forms/net-amount-after-gst"
 import { FormInput, FormTextarea } from "@/components/forms/simple"
@@ -50,6 +52,7 @@ function SaveButton({ isSaving }: { isSaving: boolean }) {
 export default function AnalyzeForm({
   file,
   categories,
+  picker,
   projects,
   currencies,
   fields,
@@ -58,7 +61,8 @@ export default function AnalyzeForm({
   autoAnalyze = false,
 }: {
   file: File
-  categories: Category[]
+  categories: Pick<Category, "code" | "name" | "color">[]
+  picker: GlPicker | null
   projects: Project[]
   currencies: Currency[]
   fields: Field[]
@@ -233,11 +237,11 @@ export default function AnalyzeForm({
         const nonEmptyFields = Object.fromEntries(
           Object.entries(results.data?.output || {}).filter(([, value]) => value !== null && value !== undefined && value !== "")
         )
-        if (
-          typeof nonEmptyFields.categoryCode === "string" &&
-          !categories.some((category) => category.code === nonEmptyFields.categoryCode)
-        ) {
-          delete nonEmptyFields.categoryCode
+        if (typeof nonEmptyFields.categoryCode === "string") {
+          const allowed = picker
+            ? new Set(picker.fields.flatMap((field) => [field.key, ...field.members]))
+            : new Set(categories.map((category) => category.code))
+          if (!allowed.has(nonEmptyFields.categoryCode)) delete nonEmptyFields.categoryCode
         }
         if (
           typeof nonEmptyFields.projectCode === "string" &&
@@ -415,15 +419,25 @@ export default function AnalyzeForm({
 
         <div className="flex flex-row gap-4">
           {isFieldShownInForm(fieldMap.categoryCode) ? (
-            <FormSelectCategory
-              title={fieldMap.categoryCode.name}
-              categories={categories}
-              name="categoryCode"
-              value={formData.categoryCode}
-              onValueChange={(value) => setFormData((prev) => ({ ...prev, categoryCode: value }))}
-              placeholder="Select Category"
-              isRequired={fieldMap.categoryCode.isRequired}
-            />
+            picker ? (
+              <div className="flex-1">
+                <GlDepartmentPicker
+                  picker={picker}
+                  initialCode={formData.categoryCode}
+                  title={fieldMap.categoryCode.name}
+                />
+              </div>
+            ) : (
+              <FormSelectCategory
+                title={fieldMap.categoryCode.name}
+                categories={categories}
+                name="categoryCode"
+                value={formData.categoryCode}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, categoryCode: value }))}
+                placeholder="Select Category"
+                isRequired={fieldMap.categoryCode.isRequired}
+              />
+            )
           ) : (
             <input type="hidden" name="categoryCode" value={formData.categoryCode} />
           )}
