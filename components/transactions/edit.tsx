@@ -43,7 +43,8 @@ export default function TransactionEditForm({
   const [deleteState, deleteAction, isDeleting] = useActionState(deleteTransactionAction, null)
   const [saveState, saveAction, isSaving] = useActionState(saveTransactionAction, null)
 
-  const extraFields = fields.filter((field) => field.isExtra)
+  const allExtraFields = fields.filter((field) => field.isExtra)
+  const extraFields = allExtraFields.filter((field) => field.code !== "documentKind")
   const [formData, setFormData] = useState({
     name: transaction.name || "",
     merchant: transaction.merchant || "",
@@ -58,7 +59,7 @@ export default function TransactionEditForm({
     issuedAt: transaction.issuedAt ? transaction.issuedAt.toISOString().slice(0, 10) : "",
     note: transaction.note || "",
     items: transaction.items || [],
-    ...extraFields.reduce(
+    ...allExtraFields.reduce(
       (acc, field) => {
         acc[field.code] = transaction.extra?.[field.code as keyof typeof transaction.extra] || ""
         return acc
@@ -95,6 +96,7 @@ export default function TransactionEditForm({
   return (
     <form action={saveAction} className="space-y-4">
       <DocumentKindTag value={(formData as { documentKind?: unknown }).documentKind} />
+      <input type="hidden" name="documentKind" value={String((formData as { documentKind?: unknown }).documentKind ?? "")} />
       <input type="hidden" name="transactionId" value={transaction.id} />
 
       <FormInput

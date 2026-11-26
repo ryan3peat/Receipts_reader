@@ -243,8 +243,8 @@ export const DEFAULT_FIELDS = [
     type: "string",
     llm_prompt:
       "What this document is. Return exactly one of: invoice, receipt, payment_confirmation. Use invoice for a tax invoice. Use receipt for a till or purchase receipt. Use payment_confirmation for a payment or bank confirmation that is not a tax invoice.",
-    isVisibleInList: false,
-    isVisibleInAnalysis: false,
+    isVisibleInList: true,
+    isVisibleInAnalysis: true,
     isRequired: false,
     isExtra: true,
   },

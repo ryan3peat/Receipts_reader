@@ -1,6 +1,7 @@
 "use client"
 
 import { BulkActionsMenu } from "@/components/transactions/bulk-actions"
+import { DocumentKindTag } from "@/components/transactions/document-kind-tag"
 import { StatusBadge } from "@/components/transactions/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -172,6 +173,15 @@ export const standardFieldRenderers: Record<string, FieldRenderer> = {
     classes: "text-right",
     sortable: true,
   },
+  documentKind: {
+    name: "Document",
+    code: "documentKind",
+    classes: "whitespace-nowrap",
+    sortable: false,
+    formatValue: (transaction: Transaction) => (
+      <DocumentKindTag value={transaction.extra?.documentKind} />
+    ),
+  },
   netAmountAfterGst: {
     name: "Net Amount after GST",
     code: "netAmountAfterGst",
@@ -273,13 +283,13 @@ export function TransactionList({
   }
 
   const renderFieldInTable = (transaction: Transaction, field: FieldWithRenderer): string | React.ReactNode => {
+    if (field.renderer.formatValue) {
+      return field.renderer.formatValue(transaction)
+    }
     if (field.isExtra) {
       return transaction.extra?.[field.code as keyof typeof transaction.extra] ?? ""
-    } else if (field.renderer.formatValue) {
-      return field.renderer.formatValue(transaction)
-    } else {
-      return String(transaction[field.code as keyof Transaction])
     }
+    return String(transaction[field.code as keyof Transaction] ?? "")
   }
 
   useEffect(() => {

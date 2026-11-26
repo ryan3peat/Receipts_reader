@@ -103,7 +103,8 @@ export default function AnalyzeForm({
     )
   }, [fields])
 
-  const extraFields = useMemo(() => fields.filter((field) => field.isExtra), [fields])
+  const allExtraFields = useMemo(() => fields.filter((field) => field.isExtra), [fields])
+  const extraFields = useMemo(() => allExtraFields.filter((field) => field.code !== "documentKind"), [allExtraFields])
   const initialFormState = useMemo(() => {
     const baseState = {
       name: file.filename,
@@ -127,7 +128,7 @@ export default function AnalyzeForm({
     }
 
     // Add extra fields
-    const extraFieldsState = extraFields.reduce(
+    const extraFieldsState = allExtraFields.reduce(
       (acc, field) => {
         acc[field.code] = ""
         return acc
@@ -152,7 +153,7 @@ export default function AnalyzeForm({
     if (!categories.some((category) => category.code === merged.categoryCode)) merged.categoryCode = ""
     if (!projects.some((project) => project.code === merged.projectCode)) merged.projectCode = ""
     return merged
-  }, [file.filename, settings, extraFields, file.cachedParseResult, categories, projects])
+  }, [file.filename, settings, allExtraFields, file.cachedParseResult, categories, projects])
   const [formData, setFormData] = useState(initialFormState)
 
   async function saveAsTransaction(formData: FormData) {
@@ -304,6 +305,7 @@ export default function AnalyzeForm({
 
       <form className="space-y-4" action={saveAsTransaction}>
         <DocumentKindTag value={(formData as { documentKind?: unknown }).documentKind} />
+        <input type="hidden" name="documentKind" value={String((formData as { documentKind?: unknown }).documentKind ?? "")} />
         <input type="hidden" name="fileId" value={file.id} />
         <FormInput
           title={fieldMap.name.name}
