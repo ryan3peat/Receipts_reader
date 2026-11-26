@@ -8,7 +8,9 @@ import { FormSelectProject } from "@/components/forms/select-project"
 import { FormSelectType } from "@/components/forms/select-type"
 import { FormInput, FormTextarea } from "@/components/forms/simple"
 import { Button } from "@/components/ui/button"
-import { Category, Currency, Project } from "@/prisma/client"
+import type { GlOption, GlPicker } from "@/lib/gl-options"
+import { Currency, Project } from "@/prisma/client"
+import { GlDepartmentPicker } from "./gl-department-picker"
 import { format } from "date-fns"
 import { Import, Loader2 } from "lucide-react"
 import Link from "next/link"
@@ -17,11 +19,13 @@ import { useActionState, useEffect, useState } from "react"
 
 export default function TransactionCreateForm({
   categories,
+  picker,
   projects,
   currencies,
   settings,
 }: {
-  categories: Category[]
+  categories: GlOption[]
+  picker: GlPicker | null
   projects: Project[]
   currencies: Currency[]
   settings: Record<string, string>
@@ -93,13 +97,19 @@ export default function TransactionCreateForm({
       </div>
 
       <div className="flex flex-row gap-4">
-        <FormSelectCategory
-          title="Category"
-          categories={categories}
-          name="categoryCode"
-          defaultValue={formData.categoryCode}
-          placeholder="Select Category"
-        />
+        {picker ? (
+          <div className="flex-1">
+            <GlDepartmentPicker picker={picker} initialCode={formData.categoryCode} title="GL code" />
+          </div>
+        ) : (
+          <FormSelectCategory
+            title="Category"
+            categories={categories}
+            name="categoryCode"
+            defaultValue={formData.categoryCode}
+            placeholder="Select Category"
+          />
+        )}
 
         <FormSelectProject
           title="Project"

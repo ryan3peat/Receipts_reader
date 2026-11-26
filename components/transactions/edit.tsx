@@ -5,6 +5,7 @@ import { ItemsDetectTool } from "@/components/agents/items-detect"
 import ToolWindow from "@/components/agents/tool-window"
 import { FormError } from "@/components/forms/error"
 import { FormSelectCategory } from "@/components/forms/select-category"
+import { GlDepartmentPicker } from "@/components/transactions/gl-department-picker"
 import { FormSelectCurrency } from "@/components/forms/select-currency"
 import { FormSelectProject } from "@/components/forms/select-project"
 import { FormSelectType } from "@/components/forms/select-type"
@@ -12,8 +13,10 @@ import { NetAmountAfterGst } from "@/components/forms/net-amount-after-gst"
 import { FormInput, FormTextarea } from "@/components/forms/simple"
 import { Button } from "@/components/ui/button"
 import { isFieldShownInForm } from "@/lib/field-validation"
+import type { DepartmentSplit } from "@/lib/gl-resolve"
+import type { GlOption, GlPicker } from "@/lib/gl-options"
 import { TransactionData } from "@/models/transactions"
-import { Category, Currency, Field, Project, Transaction } from "@/prisma/client"
+import { Currency, Field, Project, Transaction } from "@/prisma/client"
 import { Loader2, Save, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { startTransition, useActionState, useEffect, useMemo, useState } from "react"
@@ -21,13 +24,15 @@ import { startTransition, useActionState, useEffect, useMemo, useState } from "r
 export default function TransactionEditForm({
   transaction,
   categories,
+  picker,
   projects,
   currencies,
   fields,
   settings,
 }: {
   transaction: Transaction
-  categories: Category[]
+  categories: GlOption[]
+  picker: GlPicker | null
   projects: Project[]
   currencies: Currency[]
   fields: Field[]
@@ -219,13 +224,24 @@ export default function TransactionEditForm({
 
       <div className="flex flex-row gap-4">
         {isFieldShownInForm(fieldMap.categoryCode) ? (
-          <FormSelectCategory
-            title={fieldMap.categoryCode.name}
-            categories={categories}
-            name="categoryCode"
-            defaultValue={formData.categoryCode}
-            isRequired={fieldMap.categoryCode.isRequired}
-          />
+          picker ? (
+            <div className="flex-1">
+              <GlDepartmentPicker
+                picker={picker}
+                initialCode={transaction.glFieldKey || formData.categoryCode}
+                initialSplits={transaction.departmentSplits as unknown as DepartmentSplit[] | null}
+                title={fieldMap.categoryCode.name}
+              />
+            </div>
+          ) : (
+            <FormSelectCategory
+              title={fieldMap.categoryCode.name}
+              categories={categories}
+              name="categoryCode"
+              defaultValue={formData.categoryCode}
+              isRequired={fieldMap.categoryCode.isRequired}
+            />
+          )
         ) : (
           <input type="hidden" name="categoryCode" value={formData.categoryCode || ""} />
         )}

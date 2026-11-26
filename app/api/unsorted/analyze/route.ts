@@ -10,6 +10,7 @@ import { getFileById } from "@/models/files"
 import { getCategories } from "@/models/categories"
 import { getFields } from "@/models/fields"
 import { getProjects } from "@/models/projects"
+import { personGlFields } from "@/models/gl-departments"
 import { getSettings } from "@/models/settings"
 import { updateUser } from "@/models/users"
 import { NextRequest, NextResponse } from "next/server"
@@ -84,7 +85,13 @@ export async function POST(request: NextRequest) {
 
   const settings = await getSettings(user.id)
   const fields = await getFields(user.id)
-  const categories = await getCategories(user.id)
+  // A cardholder is only offered the GL codes shown to their departments.
+  const allCategories = await getCategories(user.id)
+  let categories = allCategories
+  if (actor.effectiveRole === "cardholder") {
+    const allowed = new Set((await personGlFields(user.id, actor.user.id)).flatMap((field) => field.members))
+    categories = allCategories.filter((category) => allowed.has(category.code))
+  }
   const projects = await getProjects(user.id)
 
   const prompt = buildLLMPrompt(

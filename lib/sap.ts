@@ -1,3 +1,7 @@
+import { departmentShares, efiKey, type DepartmentSplit, type EfiLookup } from "./gl-resolve"
+
+export type { DepartmentSplit } from "./gl-resolve"
+
 export type LineKind = "purchase" | "payment" | "fee" | "refund"
 
 export type GstLine = {
@@ -18,8 +22,11 @@ export type SapReceipt = {
   merchant: string | null
   name: string | null
   description: string | null
+  /** NR code chosen by the cardholder or Accounts. Null when no code has been chosen yet. */
   categoryCode: string | null
   projectCode: string | null
+  /** Departments the receipt is charged to. Empty means the cardholder's default department. */
+  departments?: DepartmentSplit[] | null
 }
 
 export type StatementPurchase = {
@@ -701,6 +708,30 @@ type Catalog = {
   categories: Map<string, string>
   projects: Map<string, string>
   dimension: string
+  /** EFI codes keyed by NR code and department. Undefined keeps the NR codes as they are (no departments set up). */
+  efi?: EfiLookup
+  /** Department of the cardholder, used when a receipt has no split. */
+  defaultDepartment?: string | null
+}
+
+function appendNote(note: string, extra: string) {
+  return note ? `${note}. ${extra}` : extra
+}
+
+// Turns the NR code on a row into the department's EFI code. Rows that cannot be posted keep a note for Accounts.
+function toEfiRow(row: SapRow, departmentCode: string, catalog: Catalog): SapRow {
+  if (!catalog.efi) return row
+  if (!row.glCode) return { ...row, note: appendNote(row.note, "Accounts to choose the GL code") }
+  const efi = catalog.efi.get(efiKey(row.glCode, departmentCode))
+  if (!efi) {
+    return {
+      ...row,
+      glCode: "",
+      glName: "",
+      note: appendNote(row.note, `No EFI code for ${row.glCode} in department ${departmentCode || "(none)"}`),
+    }
+  }
+  return { ...row, glCode: efi.code, glName: efi.name }
 }
 
 function rowsForReceipt(
@@ -710,32 +741,32 @@ function rowsForReceipt(
   catalog: Catalog,
   missing: boolean
 ): SapRow[] {
+  if (missing) return rowsForMissingReceipt(receipt, narrative, date, catalog)
+
+  const splits: DepartmentSplit[] =
+    receipt.departments && receipt.departments.length > 0
+      ? receipt.departments
+      : [{ code: catalog.defaultDepartment ?? "", percent: 100 }]
+
+  return departmentShares(receipt.totalCents, receipt.vatCents, splits).flatMap((share) =>
+    rowsForShare(receipt, narrative, date, catalog, share).map((row) => toEfiRow(row, share.code, catalog))
+  )
+}
+
+function rowsForShare(
+  receipt: SapReceipt,
+  narrative: string,
+  date: string | null,
+  catalog: Catalog,
+  share: { totalCents: number | null; vatCents: number }
+): SapRow[] {
   const project =
     (receipt.projectCode && (catalog.projects.get(receipt.projectCode) || receipt.projectCode)) || ""
   const description = receipt.name || receipt.description || ""
-  const useFbt =
-    !missing && !!receipt.categoryCode && FBT_50_50_CODES.has(receipt.categoryCode)
-
-  if (missing) {
-    return [
-      {
-        date,
-        narrative,
-        description: "MISSING RECEIPT",
-        glCode: "",
-        glName: "",
-        project: "",
-        gstCode: "",
-        amountCents: receipt.totalCents ?? 0,
-        dimension: catalog.dimension,
-        note: "No receipt uploaded. Amount is the card charge, GST unknown.",
-        missing: true,
-      },
-    ]
-  }
+  const useFbt = !!receipt.categoryCode && FBT_50_50_CODES.has(receipt.categoryCode)
 
   if (useFbt) {
-    return entertainmentFbtSplits(receipt.totalCents, receipt.vatCents).map((split) => ({
+    return entertainmentFbtSplits(share.totalCents, share.vatCents).map((split) => ({
       date,
       narrative,
       description,
@@ -750,7 +781,7 @@ function rowsForReceipt(
     }))
   }
 
-  const splits = gstLines(receipt.totalCents, receipt.vatCents)
+  const splits = gstLines(share.totalCents, share.vatCents)
   const glName = (receipt.categoryCode && catalog.categories.get(receipt.categoryCode)) || ""
   return splits.map((split) => ({
     date,
@@ -765,6 +796,24 @@ function rowsForReceipt(
     note: split.note || "",
     missing: false,
   }))
+}
+
+function rowsForMissingReceipt(receipt: SapReceipt, narrative: string, date: string | null, catalog: Catalog): SapRow[] {
+  return [
+    {
+      date,
+      narrative,
+      description: "MISSING RECEIPT",
+      glCode: "",
+      glName: "",
+      project: "",
+      gstCode: "",
+      amountCents: receipt.totalCents ?? 0,
+      dimension: catalog.dimension,
+      note: "No receipt uploaded. Amount is the card charge, GST unknown.",
+      missing: true,
+    },
+  ]
 }
 
 export function sapRowsForStatement(

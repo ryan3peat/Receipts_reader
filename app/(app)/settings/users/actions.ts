@@ -1,8 +1,9 @@
 "use server"
 
-import { requireMasterAdmin } from "@/lib/access"
+import { requireAccounts, requireMasterAdmin } from "@/lib/access"
 import { prisma } from "@/lib/db"
 import { isMasterAdminEmail } from "@/lib/master-admin"
+import { setPersonDepartments } from "@/models/gl-departments"
 import { getUserByEmail, getUserById } from "@/models/users"
 import { revalidatePath } from "next/cache"
 
@@ -58,5 +59,21 @@ export async function updateMemberRoleAction(userId: string, role: "accounts" | 
 
   await prisma.user.update({ where: { id: userId }, data: { role } })
   revalidatePath("/settings/users")
+  return { success: true }
+}
+
+export async function setPersonDepartmentsAction(personId: string, codes: string[], defaultCode: string) {
+  const gate = await requireAccounts()
+  if (!gate.ok) return { success: false, error: gate.error }
+  const person = await getUserById(personId)
+  if (!person) return { success: false, error: "Not found" }
+  if (!Array.isArray(codes) || codes.some((code) => typeof code !== "string")) {
+    return { success: false, error: "Choose departments from the list" }
+  }
+  if (codes.length === 0) return { success: false, error: "Give this person at least one department" }
+
+  await setPersonDepartments(gate.actor.companyUser.id, personId, [...new Set(codes)], defaultCode)
+  revalidatePath("/settings/users")
+  revalidatePath("/transactions")
   return { success: true }
 }
