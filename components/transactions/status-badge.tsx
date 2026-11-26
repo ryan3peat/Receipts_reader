@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils"
 
 const styles: Record<TransactionStatus, string> = {
   new: "border-amber-200 bg-amber-50 text-amber-900",
-  reviewed: "border-blue-200 bg-blue-50 text-blue-900",
+  submitted: "border-sky-200 bg-sky-50 text-sky-900",
+  matched: "border-blue-200 bg-blue-50 text-blue-900",
   exported: "border-green-200 bg-green-50 text-green-900",
 }
 

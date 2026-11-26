@@ -75,12 +75,13 @@ describe("summarizeEmployees", () => {
     expect(adam.expenseTotals).toEqual({ SGD: 6700 })
   })
 
-  it("counts receipts by status and treats an unknown status as still to review", () => {
+  it("counts receipts by status and treats legacy reviewed or unknown as To Review", () => {
     const rows = summarizeEmployees(
       members,
       [
         tx({ status: "new" }),
-        tx({ status: "reviewed" }),
+        tx({ status: "submitted" }),
+        tx({ status: "matched" }),
         tx({ status: "reviewed" }),
         tx({ status: "exported" }),
         tx({ status: "garbage" }),
@@ -90,9 +91,24 @@ describe("summarizeEmployees", () => {
       fields
     )
 
-    expect(rows.find((row) => row.id === "adam")!.statusCounts).toEqual({ new: 2, reviewed: 2, exported: 1 })
-    expect(rows.find((row) => row.id === "zoe")!.statusCounts).toEqual({ new: 0, reviewed: 0, exported: 1 })
-    expect(totalEmployeeSummaries(rows).statusCounts).toEqual({ new: 2, reviewed: 2, exported: 2 })
+    expect(rows.find((row) => row.id === "adam")!.statusCounts).toEqual({
+      new: 3,
+      submitted: 1,
+      matched: 1,
+      exported: 1,
+    })
+    expect(rows.find((row) => row.id === "zoe")!.statusCounts).toEqual({
+      new: 0,
+      submitted: 0,
+      matched: 0,
+      exported: 1,
+    })
+    expect(totalEmployeeSummaries(rows).statusCounts).toEqual({
+      new: 3,
+      submitted: 1,
+      matched: 1,
+      exported: 2,
+    })
   })
 
   it("flags incomplete receipts and receipts with no file attached", () => {
@@ -159,7 +175,7 @@ describe("totalEmployeeSummaries", () => {
 
     expect(totalEmployeeSummaries(rows)).toEqual({
       receipts: 3,
-      statusCounts: { new: 3, reviewed: 0, exported: 0 },
+      statusCounts: { new: 3, submitted: 0, matched: 0, exported: 0 },
       incomplete: 0,
       withoutFile: 1,
       pendingFiles: 1,

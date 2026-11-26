@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/db"
 import type { DepartmentSplit } from "@/lib/gl-resolve"
 import { COMPUTED_FIELD_CODES } from "@/models/defaults-data"
-import { isTransactionStatus, type ManualTransactionStatus } from "@/lib/transaction-status"
+import {
+  isTransactionStatus,
+  type ManualTransactionStatus,
+  type TransactionStatus,
+} from "@/lib/transaction-status"
 import { scopeTransactionWhere } from "@/lib/visibility"
 import { Field, Prisma, Transaction } from "@/prisma/client"
 import { cache } from "react"
@@ -223,7 +227,7 @@ async function withOwnedRelations(userId: string, standard: TransactionData) {
 export const createTransaction = async (
   userId: string,
   data: TransactionData,
-  options?: { submittedById?: string | null }
+  options?: { submittedById?: string | null; status?: TransactionStatus }
 ): Promise<Transaction> => {
   const { standard, extra } = await splitTransactionDataExtraFields(data, userId)
   await withOwnedRelations(userId, standard)
@@ -240,6 +244,7 @@ export const createTransaction = async (
       items: data.items as Prisma.InputJsonValue,
       userId,
       submittedById,
+      status: options?.status ?? "submitted",
       ...glColumns(data),
     },
   })

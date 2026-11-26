@@ -3,7 +3,7 @@
 import { bulkDeleteTransactionsAction, bulkSetTransactionStatusAction } from "@/app/(app)/transactions/actions"
 import { Button } from "@/components/ui/button"
 import type { ManualTransactionStatus } from "@/lib/transaction-status"
-import { CheckCheck, Trash2, Undo2 } from "lucide-react"
+import { Trash2, Undo2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -43,11 +43,10 @@ export function BulkActionsMenu({ selectedIds, canSetStatus = false, onActionCom
       if (!result.success) {
         throw new Error(result.error)
       }
-      const label = status === "reviewed" ? "reviewed" : "to review"
       toast.success(
         result.skipped
-          ? `Marked ${result.count} as ${label}. ${result.skipped} already exported and left unchanged.`
-          : `Marked ${result.count} as ${label}.`
+          ? `Marked ${result.count} as To Review. ${result.skipped} already exported and left unchanged.`
+          : `Marked ${result.count} as To Review.`
       )
       onActionComplete?.()
     } catch (error) {
@@ -61,16 +60,10 @@ export function BulkActionsMenu({ selectedIds, canSetStatus = false, onActionCom
   return (
     <div className="fixed bottom-20 right-4 z-50 flex flex-col items-stretch gap-2 md:bottom-4 md:flex-row">
       {canSetStatus && (
-        <>
-          <Button className="gap-2" disabled={isLoading} onClick={() => handleStatus("reviewed")}>
-            <CheckCheck className="h-4 w-4" />
-            Mark {selectedIds.length} reviewed
-          </Button>
-          <Button variant="outline" className="gap-2" disabled={isLoading} onClick={() => handleStatus("new")}>
-            <Undo2 className="h-4 w-4" />
-            Back to review
-          </Button>
-        </>
+        <Button variant="outline" className="gap-2" disabled={isLoading} onClick={() => handleStatus("new")}>
+          <Undo2 className="h-4 w-4" />
+          Mark {selectedIds.length} To Review
+        </Button>
       )}
       <Button variant="destructive" className="min-w-48 gap-2" disabled={isLoading} onClick={handleDelete}>
         <Trash2 className="h-4 w-4" />

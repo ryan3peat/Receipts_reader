@@ -12,6 +12,10 @@ import {
 } from "@/lib/sap"
 import { prisma } from "@/lib/db"
 import { efiKey, parseSplits } from "@/lib/gl-resolve"
+import {
+  syncAllNonExportedTransactionStatuses,
+  syncTransactionStatusesFromMatches,
+} from "@/lib/sync-transaction-match-status"
 
 const KINDS = new Set<LineKind>(["purchase", "payment", "fee", "refund"])
 
@@ -239,6 +243,11 @@ export async function rematchStatementsForEmployee(userId: string, employeeId: s
   for (const statement of statements) {
     await rematchStatement(statement.id, userId)
   }
+  const receipts = await matchableReceiptsForEmployee(userId, employeeId)
+  await syncTransactionStatusesFromMatches(
+    userId,
+    receipts.map((receipt) => receipt.id)
+  )
   return statements.length
 }
 
@@ -252,6 +261,8 @@ export async function rematchAllStatements(userId: string) {
   for (const statement of statements) {
     await rematchStatement(statement.id, userId)
   }
+  // Existing Reviewed rows and post-save Submitted rows land on Matched or To Review here.
+  await syncAllNonExportedTransactionStatuses(userId)
   return statements.length
 }
 

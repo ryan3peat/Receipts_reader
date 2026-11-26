@@ -1,16 +1,21 @@
-export const TRANSACTION_STATUSES = ["new", "reviewed", "exported"] as const
+export const TRANSACTION_STATUSES = ["new", "submitted", "matched", "exported"] as const
 
 export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number]
 
-// "exported" is set by an SAP export batch, never by hand, so it cannot drift from what was actually exported.
-export const MANUAL_TRANSACTION_STATUSES = ["new", "reviewed"] as const
+// Matched and Exported are system-set. Accounts can only send a row back to review by hand.
+export const MANUAL_TRANSACTION_STATUSES = ["new"] as const
 
 export type ManualTransactionStatus = (typeof MANUAL_TRANSACTION_STATUSES)[number]
 
 export const TRANSACTION_STATUS_LABELS: Record<TransactionStatus, string> = {
-  new: "To review",
-  reviewed: "Reviewed",
+  new: "To Review",
+  submitted: "Submitted",
+  matched: "Matched",
   exported: "Exported",
+}
+
+const LEGACY_STATUS_MAP: Record<string, TransactionStatus> = {
+  reviewed: "new",
 }
 
 export function isTransactionStatus(value: unknown): value is TransactionStatus {
@@ -21,7 +26,9 @@ export function isManualTransactionStatus(value: unknown): value is ManualTransa
   return typeof value === "string" && (MANUAL_TRANSACTION_STATUSES as readonly string[]).includes(value)
 }
 
-// Unknown values read as "new" so a bad row is shown as still needing review rather than hidden.
+// Unknown or retired values (e.g. reviewed) read as To Review so they stay visible in filters.
 export function toTransactionStatus(value: unknown): TransactionStatus {
-  return isTransactionStatus(value) ? value : "new"
+  if (typeof value !== "string") return "new"
+  if (isTransactionStatus(value)) return value
+  return LEGACY_STATUS_MAP[value] ?? "new"
 }

@@ -29,24 +29,27 @@ describe("bulkSetTransactionStatusAction", () => {
   it("refuses a cardholder before touching any transaction", async () => {
     vi.mocked(requireAccounts).mockResolvedValue({ ok: false, error: "Only accounts can do that" } as Gate)
 
-    const result = await bulkSetTransactionStatusAction(["a"], "reviewed")
+    const result = await bulkSetTransactionStatusAction(["a"], "new")
 
     expect(result).toEqual({ success: false, error: "Only accounts can do that" })
     expect(bulkSetTransactionStatus).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 
-  it.each(["exported", "approved", "", undefined])("refuses the status %j, which cannot be set by hand", async (status) => {
-    const result = await bulkSetTransactionStatusAction(["a"], status as string)
+  it.each(["exported", "matched", "submitted", "reviewed", "approved", "", undefined])(
+    "refuses the status %j, which cannot be set by hand",
+    async (status) => {
+      const result = await bulkSetTransactionStatusAction(["a"], status as string)
 
-    expect(result).toEqual({ success: false, error: "Unknown status" })
-    expect(bulkSetTransactionStatus).not.toHaveBeenCalled()
-  })
+      expect(result).toEqual({ success: false, error: "Unknown status" })
+      expect(bulkSetTransactionStatus).not.toHaveBeenCalled()
+    }
+  )
 
   it("updates the selected rows for the company and reports how many were skipped", async () => {
-    const result = await bulkSetTransactionStatusAction(["a", "b", "b", "c"], "reviewed")
+    const result = await bulkSetTransactionStatusAction(["a", "b", "b", "c"], "new")
 
-    expect(bulkSetTransactionStatus).toHaveBeenCalledWith(["a", "b", "c"], "company", "reviewed")
+    expect(bulkSetTransactionStatus).toHaveBeenCalledWith(["a", "b", "c"], "company", "new")
     expect(result).toEqual({ success: true, count: 2, skipped: 1 })
     expect(revalidatePath).toHaveBeenCalledWith("/transactions")
     expect(revalidatePath).toHaveBeenCalledWith("/employees")

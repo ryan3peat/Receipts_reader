@@ -30,7 +30,7 @@ function emptySummary(member: EmployeeMember | null): EmployeeSummary {
     email: member?.email ?? "",
     role: member?.role ?? "",
     receipts: 0,
-    statusCounts: { new: 0, reviewed: 0, exported: 0 },
+    statusCounts: { new: 0, submitted: 0, matched: 0, exported: 0 },
     expenseTotals: {},
     incomplete: 0,
     withoutFile: 0,
@@ -90,7 +90,7 @@ export function summarizeEmployees(
 export function totalEmployeeSummaries(rows: EmployeeSummary[]) {
   const totals = {
     receipts: 0,
-    statusCounts: { new: 0, reviewed: 0, exported: 0 } as Record<TransactionStatus, number>,
+    statusCounts: { new: 0, submitted: 0, matched: 0, exported: 0 } as Record<TransactionStatus, number>,
     incomplete: 0,
     withoutFile: 0,
     pendingFiles: 0,

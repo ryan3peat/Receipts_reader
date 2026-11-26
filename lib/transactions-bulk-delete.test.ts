@@ -97,11 +97,11 @@ describe("bulkSetTransactionStatus", () => {
   it("stays inside the company and never changes rows that were already exported", async () => {
     mocks.transaction.updateMany.mockResolvedValue({ count: 1 })
 
-    const result = await bulkSetTransactionStatus(["a", "b"], company, "reviewed")
+    const result = await bulkSetTransactionStatus(["a", "b"], company, "new")
 
     expect(mocks.transaction.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["a", "b"] }, userId: company, status: { not: "exported" } },
-      data: { status: "reviewed" },
+      data: { status: "new" },
     })
     expect(result).toEqual({ count: 1 })
   })
