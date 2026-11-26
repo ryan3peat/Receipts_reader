@@ -1,6 +1,7 @@
+import { useTransactionsPush } from "@/components/transactions/nav-pending"
 import { TransactionFilters } from "@/models/transactions"
 import { format } from "date-fns"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useMemo } from "react"
 
 const filterKeys = ["search", "dateFrom", "dateTo", "ordering", "categoryCode", "projectCode", "submittedById", "status"]
@@ -14,9 +15,9 @@ export function areSearchParamsEqual(a: URLSearchParams, b: URLSearchParams) {
 }
 
 export function useTransactionFilters(defaultFilters?: TransactionFilters) {
-  const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const push = useTransactionsPush()
   const filters = useMemo(
     () => ({
       ...defaultFilters,
@@ -33,7 +34,7 @@ export function useTransactionFilters(defaultFilters?: TransactionFilters) {
     if (areSearchParamsEqual(newSearchParams, searchParams)) return
 
     const query = newSearchParams.toString()
-    router.push(query ? `${pathname}?${query}` : pathname)
+    push(query ? `${pathname}?${query}` : pathname)
   }
 
   return [filters, setFilters] as const

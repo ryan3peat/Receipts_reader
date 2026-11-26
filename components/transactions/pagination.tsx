@@ -1,5 +1,6 @@
 "use client"
 
+import { useTransactionsPush } from "@/components/transactions/nav-pending"
 import {
   PaginationContent,
   PaginationEllipsis,
@@ -7,12 +8,12 @@ import {
   PaginationLink,
   Pagination as PaginationRoot,
 } from "@/components/ui/pagination"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 
 const MAX_VISIBLE_PAGES = 5
 
 export function Pagination({ totalItems, itemsPerPage = 1000 }: { totalItems: number; itemsPerPage: number }) {
-  const router = useRouter()
+  const push = useTransactionsPush()
   const searchParams = useSearchParams()
 
   const totalPages = Math.ceil(totalItems / itemsPerPage)
@@ -21,7 +22,7 @@ export function Pagination({ totalItems, itemsPerPage = 1000 }: { totalItems: nu
   const onPageChange = (page: number) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set("page", page.toString())
-    router.push(`?${params.toString()}`)
+    push(`?${params.toString()}`)
   }
 
   const getPageNumbers = () => {

@@ -2,6 +2,7 @@
 
 import { BulkActionsMenu } from "@/components/transactions/bulk-actions"
 import { DocumentKindTag } from "@/components/transactions/document-kind-tag"
+import { TransactionsPendingSurface, useTransactionsPush } from "@/components/transactions/nav-pending"
 import { StatusBadge } from "@/components/transactions/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -229,6 +230,7 @@ export function TransactionList({
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const router = useRouter()
+  const push = useTransactionsPush()
   const searchParams = useSearchParams()
 
   const [sorting, setSorting] = useState<{ field: string | null; direction: "asc" | "desc" | null }>(() => {
@@ -316,7 +318,7 @@ export function TransactionList({
     }
 
     const query = params.toString()
-    router.push(query ? `/transactions?${query}` : "/transactions")
+    push(query ? `/transactions?${query}` : "/transactions")
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sorting])
 
@@ -330,7 +332,7 @@ export function TransactionList({
   }
 
   return (
-    <div className="rounded-md border">
+    <TransactionsPendingSurface className="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -411,6 +413,6 @@ export function TransactionList({
           onActionComplete={() => setSelectedIds([])}
         />
       )}
-    </div>
+    </TransactionsPendingSurface>
   )
 }
