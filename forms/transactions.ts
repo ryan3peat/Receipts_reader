@@ -4,7 +4,7 @@ export const transactionFormSchema = z
   .object({
     name: z.string().max(128).optional(),
     merchant: z.string().max(128).optional(),
-    description: z.string().max(256).optional(),
+    description: z.string().max(2000).optional(),
     type: z.string().optional(),
     total: z
       .string()
@@ -68,3 +68,14 @@ export const transactionFormSchema = z
       }),
   })
   .catchall(z.string())
+
+/** One readable sentence for the first validation problem, instead of the raw Zod JSON. */
+export function readableFormError(error: z.ZodError): string {
+  const issue = error.issues[0]
+  if (!issue) return "Invalid form data"
+  const field = issue.path.join(".") || "Form"
+  if (issue.code === z.ZodIssueCode.too_big) {
+    return `${field} must be ${issue.maximum} characters or fewer.`
+  }
+  return `${field}: ${issue.message}`
+}

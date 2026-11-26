@@ -1,6 +1,6 @@
 "use server"
 
-import { transactionFormSchema } from "@/forms/transactions"
+import { readableFormError, transactionFormSchema } from "@/forms/transactions"
 import { requireAccounts } from "@/lib/access"
 import { ActionState } from "@/lib/actions"
 import { getCurrentUser, isSubscriptionExpired } from "@/lib/auth"
@@ -41,7 +41,7 @@ export async function createTransactionAction(
     const validatedForm = transactionFormSchema.safeParse(Object.fromEntries(formData.entries()))
 
     if (!validatedForm.success) {
-      return { success: false, error: validatedForm.error.message }
+      return { success: false, error: readableFormError(validatedForm.error) }
     }
 
     const missing = missingRequiredFormFieldNames(await getFields(user.id), validatedForm.data)
@@ -95,7 +95,7 @@ export async function saveTransactionAction(
     const validatedForm = transactionFormSchema.safeParse(Object.fromEntries(formData.entries()))
 
     if (!validatedForm.success) {
-      return { success: false, error: validatedForm.error.message }
+      return { success: false, error: readableFormError(validatedForm.error) }
     }
 
     const missing = missingRequiredFormFieldNames(await getFields(user.id), validatedForm.data)

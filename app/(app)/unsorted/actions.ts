@@ -1,6 +1,6 @@
 "use server"
 
-import { transactionFormSchema } from "@/forms/transactions"
+import { readableFormError, transactionFormSchema } from "@/forms/transactions"
 import { ActionState } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/auth"
 import { missingRequiredFormFieldNames } from "@/lib/field-validation"
@@ -37,7 +37,7 @@ export async function saveFileAsTransactionAction(
     const validatedForm = transactionFormSchema.safeParse(Object.fromEntries(formData.entries()))
 
     if (!validatedForm.success) {
-      return { success: false, error: validatedForm.error.message }
+      return { success: false, error: readableFormError(validatedForm.error) }
     }
 
     const missing = missingRequiredFormFieldNames(await getFields(user.id), validatedForm.data)
