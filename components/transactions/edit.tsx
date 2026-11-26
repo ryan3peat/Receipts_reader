@@ -5,6 +5,7 @@ import { ItemsDetectTool } from "@/components/agents/items-detect"
 import ToolWindow from "@/components/agents/tool-window"
 import { FormError } from "@/components/forms/error"
 import { FormSelectCategory } from "@/components/forms/select-category"
+import { DocumentKindTag } from "@/components/transactions/document-kind-tag"
 import { GlDepartmentPicker } from "@/components/transactions/gl-department-picker"
 import { FormSelectCurrency } from "@/components/forms/select-currency"
 import { FormSelectProject } from "@/components/forms/select-project"
@@ -93,6 +94,7 @@ export default function TransactionEditForm({
 
   return (
     <form action={saveAction} className="space-y-4">
+      <DocumentKindTag value={(formData as { documentKind?: unknown }).documentKind} />
       <input type="hidden" name="transactionId" value={transaction.id} />
 
       <FormInput

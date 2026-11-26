@@ -10,6 +10,7 @@ import { FormError } from "@/components/forms/error"
 import { FormSelectCategory } from "@/components/forms/select-category"
 import { FormSelectCurrency } from "@/components/forms/select-currency"
 import { FormSelectProject } from "@/components/forms/select-project"
+import { DocumentKindTag } from "@/components/transactions/document-kind-tag"
 import { GlDepartmentPicker } from "@/components/transactions/gl-department-picker"
 import type { GlPicker } from "@/lib/gl-options"
 import { FormSelectType } from "@/components/forms/select-type"
@@ -302,6 +303,7 @@ export default function AnalyzeForm({
       )}
 
       <form className="space-y-4" action={saveAsTransaction}>
+        <DocumentKindTag value={(formData as { documentKind?: unknown }).documentKind} />
         <input type="hidden" name="fileId" value={file.id} />
         <FormInput
           title={fieldMap.name.name}

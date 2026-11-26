@@ -1,6 +1,7 @@
 "use server"
 
 import { ActionState } from "@/lib/actions"
+import { normalizeDocumentKind } from "@/lib/document-kind"
 import { prisma } from "@/lib/db"
 import { updateFile } from "@/models/files"
 import { getLLMSettings, getSettings } from "@/models/settings"
@@ -36,6 +37,9 @@ export async function analyzeTransaction(
     const result = response.output
     const tokensUsed = response.tokensUsed || 0
     await keepOwnedCodes(userId, result)
+    const documentKind = normalizeDocumentKind(result.documentKind)
+    if (documentKind) result.documentKind = documentKind
+    else delete result.documentKind
 
     console.log("LLM response:", result)
     console.log("LLM tokens used:", tokensUsed)

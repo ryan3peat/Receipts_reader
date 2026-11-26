@@ -15,6 +15,7 @@ Projects:
 RULES:
 - categoryCode must be one of the GL codes above. Never invent a code, and do not add a department suffix.
 - GST is Australian. vat is the GST amount in the receipt currency. vat_rate is 10 when GST is charged and 0 when the receipt is GST-free.
+- documentKind must be exactly one of: invoice, receipt, payment_confirmation.
 - If you cannot find a value, leave it blank. Never make up a merchant, date, amount, or GL code.
 - Return only one object`
 
@@ -233,6 +234,17 @@ export const DEFAULT_FIELDS = [
     llm_prompt: "GST amount in the receipt currency. Use 0 when the receipt is GST-free.",
     isVisibleInList: false,
     isVisibleInAnalysis: true,
+    isRequired: false,
+    isExtra: true,
+  },
+  {
+    code: "documentKind",
+    name: "Document",
+    type: "string",
+    llm_prompt:
+      "What this document is. Return exactly one of: invoice, receipt, payment_confirmation. Use invoice for a tax invoice. Use receipt for a till or purchase receipt. Use payment_confirmation for a payment or bank confirmation that is not a tax invoice.",
+    isVisibleInList: false,
+    isVisibleInAnalysis: false,
     isRequired: false,
     isExtra: true,
   },
