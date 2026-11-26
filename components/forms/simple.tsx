@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { SelectProps } from "@radix-ui/react-select"
 import { format } from "date-fns"
-import { CalendarIcon, Upload } from "lucide-react"
+import { CalendarIcon, Check, ChevronDown, Upload } from "lucide-react"
 import { InputHTMLAttributes, TextareaHTMLAttributes, useEffect, useRef, useState } from "react"
 
 type FormInputProps = InputHTMLAttributes<HTMLInputElement> & {
@@ -122,6 +122,7 @@ export const FormSelect = ({
     (props.value as string | undefined) || (props.defaultValue as string | undefined)
   )
   const [query, setQuery] = useState("")
+  const [open, setOpen] = useState(false)
   const isControlled = props.value !== undefined
   const selectValue = (isControlled ? (props.value as string | undefined) : internalValue) || ""
   const isEmpty = !selectValue || selectValue.toString().trim() === ""
@@ -140,6 +141,106 @@ export const FormSelect = ({
 
   if (hideIfEmpty && isEmpty) {
     return null
+  }
+
+  const renderItemContent = (item: (typeof items)[number]) => (
+    <div className="flex items-center gap-2 text-base pr-2">
+      {item.logo && <Image src={item.logo} alt={item.name} width={20} height={20} className="rounded-full" />}
+      {item.badge && <Badge className="px-2">{item.badge}</Badge>}
+      {!item.badge && item.color && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />}
+      {item.name}
+    </div>
+  )
+
+  // Radix Select closes on window resize (mobile keyboard opening), so searchable
+  // selects use a Popover instead, which stays open when the viewport resizes.
+  if (searchable) {
+    const selectedItem = items.find((item) => item.code === selectValue)
+    const pick = (code: string) => {
+      handleChange(code)
+      setOpen(false)
+      setQuery("")
+    }
+    return (
+      <span className="flex flex-col gap-1">
+        {title && (
+          <span className="text-sm font-medium" id={labelId}>
+            {title}
+          </span>
+        )}
+        {name && <input type="hidden" name={name} value={selectValue} required={isRequired} />}
+        <Popover
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next)
+            if (!next) setQuery("")
+          }}
+        >
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              id={controlId}
+              role="combobox"
+              aria-expanded={open}
+              aria-labelledby={labelId}
+              aria-required={isRequired || undefined}
+              disabled={props.disabled}
+              className={cn(
+                "flex h-9 w-full min-w-[150px] items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+                isRequired && isEmpty && "bg-yellow-50",
+                !selectedItem && "text-muted-foreground"
+              )}
+            >
+              <span className="line-clamp-1 text-left">{selectedItem?.name || placeholder}</span>
+              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="p-0 w-[var(--radix-popover-trigger-width)] min-w-[220px] max-w-[calc(100vw-1rem)]"
+          >
+            <div className="p-2 border-b">
+              <Input
+                value={query}
+                placeholder={searchPlaceholder}
+                className="h-8 bg-background text-base md:text-sm"
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto p-1">
+              {emptyValue && (
+                <button
+                  type="button"
+                  className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+                  onClick={() => pick("-")}
+                >
+                  {emptyValue}
+                </button>
+              )}
+              {visibleItems.length === 0 ? (
+                <div className="px-2 py-3 text-sm text-muted-foreground">No matching GL codes</div>
+              ) : (
+                visibleItems.map((item) => (
+                  <button
+                    type="button"
+                    key={item.code}
+                    className={cn(
+                      "relative flex w-full items-center rounded-sm py-1.5 pl-2 pr-8 text-left text-sm hover:bg-accent",
+                      item.code === selectValue && "bg-accent"
+                    )}
+                    onClick={() => pick(item.code)}
+                  >
+                    {renderItemContent(item)}
+                    {item.code === selectValue && <Check className="absolute right-2 h-4 w-4" />}
+                  </button>
+                ))
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </span>
+    )
   }
 
   return (
