@@ -3,6 +3,7 @@
 import { parseCSVAction, saveTransactionsAction } from "@/app/(app)/import/csv/actions"
 import { FormError } from "@/components/forms/error"
 import { Button } from "@/components/ui/button"
+import { COMPUTED_FIELD_CODES } from "@/models/defaults-data"
 import { Field } from "@/prisma/client"
 import { Loader2, Play, Upload } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -158,11 +159,13 @@ export function ImportCSVTable({ fields }: { fields: Field[] }) {
                           onChange={(e) => handleMappingChange(index, e.target.value)}
                         >
                           <option value="">Skip column</option>
-                          {fields.map((field) => (
-                            <option key={field.code} value={field.code}>
-                              {field.name}
-                            </option>
-                          ))}
+                          {fields
+                            .filter((field) => !COMPUTED_FIELD_CODES.has(field.code))
+                            .map((field) => (
+                              <option key={field.code} value={field.code}>
+                                {field.name}
+                              </option>
+                            ))}
                         </select>
                       </th>
                     ))}

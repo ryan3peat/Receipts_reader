@@ -1,6 +1,7 @@
+import { COMPUTED_FIELD_CODES } from "@/models/defaults-data"
 import { Field } from "@/prisma/client"
 
-const NON_FORM_FIELD_CODES = new Set(["files"])
+const NON_FORM_FIELD_CODES = new Set(["files", ...COMPUTED_FIELD_CODES])
 
 function isEmptyValue(value: unknown): boolean {
   if (value === undefined || value === null) return true

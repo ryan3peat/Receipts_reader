@@ -82,6 +82,9 @@ export const DEFAULT_CURRENCIES = [
   { code: "JPY", name: "Yen" },
 ]
 
+/** Calculated from the total and GST. Stored only as a column choice, never as receipt data. */
+export const COMPUTED_FIELD_CODES = new Set(["netAmountAfterGst"])
+
 export const DEFAULT_FIELDS = [
   {
     code: "name",
@@ -232,6 +235,16 @@ export const DEFAULT_FIELDS = [
     isVisibleInAnalysis: true,
     isRequired: false,
     isExtra: true,
+  },
+  {
+    code: "netAmountAfterGst",
+    name: "Net Amount after GST",
+    type: "number",
+    llm_prompt: "",
+    isVisibleInList: false,
+    isVisibleInAnalysis: false,
+    isRequired: false,
+    isExtra: false,
   },
   {
     code: "text",

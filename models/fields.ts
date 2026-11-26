@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db"
 import { codeFromName } from "@/lib/utils"
+import { ensureDefaultFields } from "@/models/defaults"
 import { Prisma } from "@/prisma/client"
 import { cache } from "react"
 
@@ -8,6 +9,7 @@ export type FieldData = {
 }
 
 export const getFields = cache(async (userId: string) => {
+  await ensureDefaultFields(userId)
   return await prisma.field.findMany({
     where: { userId },
     orderBy: {

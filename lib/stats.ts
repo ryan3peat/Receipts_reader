@@ -1,4 +1,5 @@
 import { isDailyPeriod } from "@/lib/utils"
+import { COMPUTED_FIELD_CODES } from "@/models/defaults-data"
 import type { DetailedTimeSeriesData } from "@/models/stats"
 import type { TransactionFilters } from "@/models/transactions"
 import { Field, Transaction } from "@/prisma/client"
@@ -120,6 +121,7 @@ export const incompleteTransactionFields = (fields: Field[], transaction: Transa
   const requiredFields = fields.filter((field) => field.isRequired)
 
   return requiredFields.filter((field) => {
+    if (COMPUTED_FIELD_CODES.has(field.code)) return false
     const value = field.isExtra
       ? (transaction.extra as Record<string, unknown>)?.[field.code]
       : transaction[field.code as keyof Transaction]

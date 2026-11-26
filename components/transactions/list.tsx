@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/transactions/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { netAmountAfterGstCents } from "@/lib/sap"
 import { calcNetTotalPerCurrency, calcTotalPerCurrency, isTransactionIncomplete } from "@/lib/stats"
 import { cn, formatCurrency } from "@/lib/utils"
 import { Category, Field, Project, Transaction } from "@/prisma/client"
@@ -170,6 +171,20 @@ export const standardFieldRenderers: Record<string, FieldRenderer> = {
     code: "currencyCode",
     classes: "text-right",
     sortable: true,
+  },
+  netAmountAfterGst: {
+    name: "Net Amount after GST",
+    code: "netAmountAfterGst",
+    classes: "text-right whitespace-nowrap",
+    sortable: false,
+    formatValue: (transaction: Transaction) => {
+      const cents = netAmountAfterGstCents(transaction.total, transaction.extra)
+      return (
+        <div className="text-right">
+          {transaction.currencyCode ? formatCurrency(cents, transaction.currencyCode) : (cents / 100).toFixed(2)}
+        </div>
+      )
+    },
   },
 }
 

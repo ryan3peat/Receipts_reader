@@ -75,3 +75,21 @@ export async function isDatabaseEmpty(userId: string) {
   const fieldsCount = await prisma.field.count({ where: { userId } })
   return fieldsCount === 0
 }
+
+/** Insert default fields added after this account was created. Existing fields are left as the user set them. */
+export async function ensureDefaultFields(userId: string) {
+  const existing = await prisma.field.findMany({
+    where: { userId },
+    select: { code: true },
+  })
+  const have = new Set(existing.map((field) => field.code))
+
+  for (const field of DEFAULT_FIELDS) {
+    if (have.has(field.code)) continue
+    await prisma.field.upsert({
+      where: { userId_code: { code: field.code, userId } },
+      update: {},
+      create: { ...field, userId },
+    })
+  }
+}

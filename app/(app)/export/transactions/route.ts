@@ -1,4 +1,5 @@
 import { listMembers, requireAccounts } from "@/lib/access"
+import { netAmountAfterGstCents } from "@/lib/sap"
 import { getCurrentUser } from "@/lib/auth"
 import {
   getTransactionExportFileName,
@@ -78,7 +79,9 @@ export async function GET(request: Request) {
           }
 
           let value
-          if (field.isExtra) {
+          if (field.code === "netAmountAfterGst") {
+            value = netAmountAfterGstCents(transaction.total, transaction.extra)
+          } else if (field.isExtra) {
             value = transaction.extra?.[field.code as keyof typeof transaction.extra] ?? ""
           } else {
             value = transaction[field.code as keyof typeof transaction] ?? ""

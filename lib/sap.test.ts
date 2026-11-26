@@ -6,6 +6,7 @@ import {
   matchStatementLines,
   missingPurchases,
   parseStatementOutput,
+  netAmountAfterGstCents,
   resolveVatCents,
   sapRowsForStatement,
   type SapReceipt,
@@ -70,6 +71,20 @@ describe("entertainmentFbtSplits", () => {
         note: "FBT 50-50: deductible half (GST claimable)",
       },
     ])
+  })
+})
+
+describe("netAmountAfterGstCents", () => {
+  it("subtracts the GST amount from the total", () => {
+    expect(netAmountAfterGstCents(11000, { vat: "10.00" })).toBe(10000)
+  })
+
+  it("derives GST from a 10 percent rate when no amount was entered", () => {
+    expect(netAmountAfterGstCents(11000, { vat_rate: "10" })).toBe(10000)
+  })
+
+  it("leaves a GST-free total unchanged", () => {
+    expect(netAmountAfterGstCents(22800, { vat: "0", vat_rate: "0" })).toBe(22800)
   })
 })
 

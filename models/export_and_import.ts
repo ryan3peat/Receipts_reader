@@ -40,6 +40,14 @@ export const EXPORT_AND_IMPORT_FIELD_MAP: Record<string, ExportImportFieldSettin
       return isNaN(num) ? 0.0 : num * 100
     },
   },
+  netAmountAfterGst: {
+    code: "netAmountAfterGst",
+    type: "number",
+    export: async function (userId: string, value: number | null) {
+      if (value === null || value === undefined) return null
+      return value / 100
+    },
+  },
   currencyCode: {
     code: "currencyCode",
     type: "string",

@@ -45,7 +45,7 @@ export function ColumnSelector({ fields, onChange }: { fields: Field[]; onChange
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ColumnsIcon className="h-4 w-4" />}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="max-h-[70vh] w-64 overflow-y-auto">
         <DropdownMenuLabel>Show Columns</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {fields.map((field) => (

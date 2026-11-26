@@ -1,6 +1,6 @@
 "use client"
 
-import { resolveVatCents } from "@/lib/sap"
+import { netAmountAfterGstCents } from "@/lib/sap"
 import { FormInput } from "@/components/forms/simple"
 
 /** Read-only total minus GST, matching the SAP export "Amount after GST" column. */
@@ -14,11 +14,12 @@ export function NetAmountAfterGst({
   vatRate?: number | string | null | undefined
 }) {
   const totalCents = Math.round((Number(total) || 0) * 100)
-  const vatCents = resolveVatCents(totalCents, {
-    vat: vat == null || vat === "" ? undefined : String(vat),
-    vat_rate: vatRate == null || vatRate === "" ? undefined : String(vatRate),
-  })
-  const net = ((totalCents - vatCents) / 100).toFixed(2)
+  const net = (
+    netAmountAfterGstCents(totalCents, {
+      vat: vat == null || vat === "" ? undefined : String(vat),
+      vat_rate: vatRate == null || vatRate === "" ? undefined : String(vatRate),
+    }) / 100
+  ).toFixed(2)
 
   return (
     <FormInput

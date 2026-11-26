@@ -62,6 +62,12 @@ export function moneyCents(extra: unknown, key: string): number {
   return Math.round(value * 100)
 }
 
+/** Total minus GST, in cents. Matches the form field and the SAP "Amount after GST" column. */
+export function netAmountAfterGstCents(totalCents: number | null | undefined, extra: unknown): number {
+  const total = totalCents ?? 0
+  return total - resolveVatCents(total, extra)
+}
+
 export function resolveVatCents(totalCents: number | null, extra: unknown): number {
   const vat = moneyCents(extra, "vat")
   if (vat > 0) return vat

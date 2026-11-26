@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { COMPUTED_FIELD_CODES } from "@/models/defaults-data"
 import { isTransactionStatus, type ManualTransactionStatus } from "@/lib/transaction-status"
 import { scopeTransactionWhere } from "@/lib/visibility"
 import { Field, Prisma, Transaction } from "@/prisma/client"
@@ -312,7 +313,7 @@ const splitTransactionDataExtraFields = async (
 
   Object.entries(data).forEach(([key, value]) => {
     const fieldDef = fieldMap[key]
-    if (fieldDef) {
+    if (fieldDef && !COMPUTED_FIELD_CODES.has(key)) {
       if (fieldDef.isExtra) {
         extra[key] = value
       } else {
