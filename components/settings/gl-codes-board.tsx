@@ -13,6 +13,21 @@ import {
 } from "@/app/(app)/settings/categories/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  pointerWithin,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
@@ -33,7 +48,7 @@ export type BoardData = {
   nrCodes: { code: string; name: string }[]
 }
 
-type Drag = { ids: string[]; origin: string | null }
+type DragData = { fieldId: string; origin: string | null; ids: string[] }
 type Dialog =
   | { kind: "combine"; ids: string[] }
   | { kind: "rename"; field: BoardField }
@@ -41,7 +56,30 @@ type Dialog =
   | { kind: "new-efi" }
   | null
 
+const boardCollision: CollisionDetection = (args) => {
+  const hits = pointerWithin(args)
+  if (hits.length > 0) return hits
+  return closestCenter(args)
+}
+
 const TONE = ["border-teal-600", "border-amber-500", "border-violet-600", "border-blue-700", "border-emerald-700", "border-rose-700", "border-yellow-700"]
+const POOL_ID = "pool"
+
+function fieldDragId(fieldId: string, origin: string | null) {
+  return origin ? `lane:${origin}:${fieldId}` : `pool:${fieldId}`
+}
+
+function parseDropTarget(overId: string): { kind: "pool" } | { kind: "department"; departmentId: string } | { kind: "combine"; fieldId: string } | null {
+  if (overId === POOL_ID) return { kind: "pool" }
+  if (overId.startsWith("dept:")) return { kind: "department", departmentId: overId.slice(5) }
+  if (overId.startsWith("combine:")) return { kind: "combine", fieldId: overId.slice(8) }
+  // Dropping onto a card inside a lane still counts as that department.
+  if (overId.startsWith("lane:")) {
+    const parts = overId.split(":")
+    if (parts.length >= 3) return { kind: "department", departmentId: parts[1] }
+  }
+  return null
+}
 
 export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDepartments: boolean }) {
   const router = useRouter()
@@ -54,9 +92,12 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
   const [selected, setSelected] = useState<Set<string>>(new Set())
   // Local board state updates instantly; department saves go to the server in the background.
   const [fields, setFields] = useState(data.fields)
-  const dragRef = useRef<Drag | null>(null)
   const pendingSaves = useRef(0)
   const [savingCount, setSavingCount] = useState(0)
+  const [activeDrag, setActiveDrag] = useState<DragData | null>(null)
+  const [overDepartmentId, setOverDepartmentId] = useState<string | null>(null)
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   useEffect(() => {
     if (pendingSaves.current === 0) setFields(data.fields)
@@ -69,17 +110,6 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
     for (const efi of data.efi) if (efi.nrCode) map.set(`${efi.nrCode}|${efi.departmentId}`, efi)
     return map
   }, [data.efi])
-
-  function beginDrag(event: React.DragEvent, next: Drag) {
-    // Ref is set synchronously so dragOver/drop see it before React re-renders.
-    dragRef.current = next
-    event.dataTransfer.setData("text/plain", next.ids.join(","))
-    event.dataTransfer.effectAllowed = "move"
-  }
-
-  function endDrag() {
-    dragRef.current = null
-  }
 
   function run(work: () => Promise<{ success: boolean; error?: string }>, done?: string) {
     setMessage(null)
@@ -119,7 +149,6 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
           setMessage({ kind: "error", text: result.error ?? "Could not save that change." })
           return
         }
-        // Soft refresh so other tabs and the EFI gaps stay in sync, without blocking the board.
         if (pendingSaves.current === 0) router.refresh()
       })
       .catch(() => {
@@ -186,28 +215,49 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
     setDialog({ kind: "combine", ids })
   }
 
-  function onPoolDrop() {
-    const current = dragRef.current
-    if (!current || current.origin === null) return
-    patchDepartments(current.ids, [], [current.origin])
-    endDrag()
+  function onDragStart(event: DragStartEvent) {
+    const data = event.active.data.current as DragData | undefined
+    if (!data) return
+    setActiveDrag(data)
   }
 
-  function onLaneDrop(departmentId: string) {
-    const current = dragRef.current
-    if (!current || current.origin === departmentId) return
-    const origin = current.origin
-    // Moving between departments removes the old one; dragging from the pool only adds.
-    patchDepartments(current.ids, [departmentId], origin ? [origin] : [])
-    endDrag()
+  function onDragOver(event: DragOverEvent) {
+    const overId = event.over?.id ? String(event.over.id) : null
+    if (!overId) {
+      setOverDepartmentId(null)
+      return
+    }
+    const target = parseDropTarget(overId)
+    setOverDepartmentId(target?.kind === "department" ? target.departmentId : null)
   }
 
-  function onPoolCardDrop(targetId: string) {
-    const current = dragRef.current
-    if (!current || current.origin !== null) return
-    const ids = [...new Set([...current.ids, targetId])]
-    endDrag()
-    openCombine(ids)
+  function onDragEnd(event: DragEndEvent) {
+    const data = (event.active.data.current as DragData | undefined) ?? activeDrag
+    const overId = event.over?.id ? String(event.over.id) : null
+    setActiveDrag(null)
+    setOverDepartmentId(null)
+    if (!data || !overId) return
+
+    const target = parseDropTarget(overId)
+    if (!target) return
+
+    if (target.kind === "combine") {
+      if (data.origin === null && !data.ids.includes(target.fieldId)) openCombine([...data.ids, target.fieldId])
+      return
+    }
+
+    if (target.kind === "pool") {
+      if (data.origin) patchDepartments(data.ids, [], [data.origin])
+      return
+    }
+
+    if (target.departmentId === data.origin) return
+    patchDepartments(data.ids, [target.departmentId], data.origin ? [data.origin] : [])
+  }
+
+  function onDragCancel() {
+    setActiveDrag(null)
+    setOverDepartmentId(null)
   }
 
   function cardTags(field: BoardField, departmentId: string | null) {
@@ -229,6 +279,8 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
     })
   }
 
+  const overlayField = activeDrag ? fieldById.get(activeDrag.fieldId) : null
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 border-b">
@@ -248,9 +300,7 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
       {message && (
         <p className={`text-sm ${message.kind === "error" ? "text-red-600" : "text-green-700"}`}>{message.text}</p>
       )}
-      {savingCount > 0 && !message && (
-        <p className="text-xs text-muted-foreground">Saving…</p>
-      )}
+      {savingCount > 0 && !message && <p className="text-xs text-muted-foreground">Saving…</p>}
 
       {tab === "board" && (
         <>
@@ -272,7 +322,7 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
             ))}
             <span className="flex-1" />
             <span className="text-xs text-muted-foreground">
-              Drag a GL code onto a department. Tick two or drop one on another to combine.
+              Drag a GL code onto a department. Tick two to combine.
             </span>
             <Button variant="outline" disabled={selected.size < 2} onClick={() => openCombine([...selected])}>
               {selected.size >= 2 ? `Combine ${selected.size} selected` : "Combine selected"}
@@ -287,164 +337,64 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
             <Button onClick={() => setDialog({ kind: "new-nr" })}>+ New GL code</Button>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
-            <div
-              className="flex max-h-[70vh] min-h-[320px] flex-col rounded-md border bg-muted/30"
-              onDragOver={(event) => {
-                if (dragRef.current && dragRef.current.origin !== null) event.preventDefault()
-              }}
-              onDrop={(event) => {
-                event.preventDefault()
-                onPoolDrop()
-              }}
-            >
-              <div className="flex items-center justify-between border-b px-3 py-2 text-sm font-medium">
-                <span>GL codes (NR)</span>
-                <span className="text-xs text-muted-foreground">
-                  {visible.length} of {fields.length}
-                </span>
-              </div>
-              <div className="flex-1 space-y-2 overflow-y-auto p-2">
-                {visible.map((field) => (
-                  <div
-                    key={field.id}
-                    draggable
-                    onDragStart={(event) =>
-                      beginDrag(event, { ids: selected.has(field.id) ? [...selected] : [field.id], origin: null })
-                    }
-                    onDragEnd={() => endDrag()}
-                    onDragOver={(event) => {
-                      const current = dragRef.current
-                      if (current && current.origin === null && !current.ids.includes(field.id)) event.preventDefault()
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      onPoolCardDrop(field.id)
-                    }}
-                    className="rounded-md border bg-background p-2 text-sm"
-                  >
-                    <div className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        className="mt-1"
-                        checked={selected.has(field.id)}
-                        onChange={() => toggleSelected(field.id)}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium leading-snug">
-                          {!field.combined && <span className="mr-1 font-mono text-xs">{field.key}</span>}
-                          {field.name}
-                          {field.combined && <Tag tone="muted">combined</Tag>}
-                        </div>
-                        {field.combined && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {field.members.map((nr) => (
-                              <span key={nr} className="rounded bg-muted px-1 font-mono text-xs">
-                                {nr}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <div className="mt-1 flex flex-wrap gap-1">{cardTags(field, null)}</div>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <button
-                          className="text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => setDialog({ kind: "rename", field })}
-                          title={field.combined ? "Rename or change post code" : "Rename"}
-                        >
-                          ✎
-                        </button>
-                        {field.combined && (
-                          <button
-                            className="text-xs text-muted-foreground hover:text-foreground"
-                            title="Split back into the individual GL codes"
-                            onClick={() => run(() => splitFieldAction(field.id), "Split back into GL codes")}
-                          >
-                            split
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {visible.length === 0 && <p className="p-4 text-center text-xs text-muted-foreground">No GL codes match</p>}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={boardCollision}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDragEnd={onDragEnd}
+            onDragCancel={onDragCancel}
+          >
+            <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
+              <PoolColumn
+                fields={visible}
+                total={fields.length}
+                selected={selected}
+                activeFieldId={activeDrag?.fieldId ?? null}
+                isOverPool={Boolean(activeDrag?.origin)}
+                onToggle={toggleSelected}
+                onRename={(field) => setDialog({ kind: "rename", field })}
+                onSplit={(id) => run(() => splitFieldAction(id), "Split back into GL codes")}
+                cardTags={cardTags}
+              />
+
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {data.departments.map((department, index) => {
+                  const members = fields.filter((field) => field.departmentIds.includes(department.id))
+                  const gaps = members.filter((field) => field.members.some((nr) => !efiFor.has(`${nr}|${department.id}`)))
+                  const showGap =
+                    overDepartmentId === department.id &&
+                    activeDrag !== null &&
+                    activeDrag.origin !== department.id
+                  return (
+                    <DepartmentLane
+                      key={department.id}
+                      department={department}
+                      tone={TONE[index % TONE.length]}
+                      members={members}
+                      gaps={gaps.length}
+                      showGap={showGap}
+                      activeFieldId={activeDrag?.fieldId ?? null}
+                      onRemove={(fieldId) => patchDepartments([fieldId], [], [department.id])}
+                      cardTags={cardTags}
+                    />
+                  )
+                })}
+                {data.departments.length === 0 && <p className="text-sm text-muted-foreground">No departments yet.</p>}
               </div>
             </div>
 
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {data.departments.map((department, index) => {
-                const members = fields.filter((field) => field.departmentIds.includes(department.id))
-                const gaps = members.filter((field) => field.members.some((nr) => !efiFor.has(`${nr}|${department.id}`)))
-                return (
-                  <div
-                    key={department.id}
-                    onDragOver={(event) => {
-                      const current = dragRef.current
-                      if (current && current.origin !== department.id) event.preventDefault()
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault()
-                      onLaneDrop(department.id)
-                    }}
-                    className={`flex max-h-[70vh] min-h-[320px] w-56 shrink-0 flex-col rounded-md border border-t-4 bg-background ${TONE[index % TONE.length]}`}
-                  >
-                    <div className="border-b px-3 py-2">
-                      <div className="flex items-center justify-between text-sm font-semibold">
-                        <span>
-                          {department.code} {department.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{members.length}</span>
-                      </div>
-                      {gaps.length > 0 && <p className="text-xs text-amber-700">{gaps.length} without EFI code</p>}
-                    </div>
-                    <div className="flex-1 space-y-2 overflow-y-auto p-2">
-                      {members.map((field) => (
-                        <div
-                          key={field.id}
-                          draggable
-                          onDragStart={(event) => {
-                            if ((event.target as HTMLElement).closest("button")) {
-                              event.preventDefault()
-                              return
-                            }
-                            beginDrag(event, { ids: [field.id], origin: department.id })
-                          }}
-                          onDragEnd={() => endDrag()}
-                          className="rounded-md border bg-muted/30 p-2 text-sm"
-                        >
-                          <div className="flex items-start justify-between gap-1">
-                            <span className="font-medium leading-snug">{field.name}</span>
-                            <button
-                              type="button"
-                              className="shrink-0 text-muted-foreground hover:text-red-600"
-                              title="Remove from this department"
-                              onMouseDown={(event) => event.stopPropagation()}
-                              onClick={(event) => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                patchDepartments([field.id], [], [department.id])
-                              }}
-                            >
-                              ×
-                            </button>
-                          </div>
-                          <div className="mt-1 flex flex-wrap gap-1">{cardTags(field, department.id)}</div>
-                        </div>
-                      ))}
-                      {members.length === 0 && (
-                        <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
-                          Drop GL codes here. Cardholders in this department only see these.
-                        </p>
-                      )}
-                    </div>
+            <DragOverlay dropAnimation={null}>
+              {overlayField ? (
+                <div className="w-56 cursor-grabbing rounded-md border bg-background p-2 text-sm shadow-lg ring-2 ring-primary/30">
+                  <div className="font-medium leading-snug">
+                    {!overlayField.combined && <span className="mr-1 font-mono text-xs">{overlayField.key}</span>}
+                    {overlayField.name}
                   </div>
-                )
-              })}
-              {data.departments.length === 0 && <p className="text-sm text-muted-foreground">No departments yet.</p>}
-            </div>
-          </div>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </>
       )}
 
@@ -493,6 +443,264 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
           }}
         />
       )}
+    </div>
+  )
+}
+
+function PoolColumn({
+  fields,
+  total,
+  selected,
+  activeFieldId,
+  isOverPool,
+  onToggle,
+  onRename,
+  onSplit,
+  cardTags,
+}: {
+  fields: BoardField[]
+  total: number
+  selected: Set<string>
+  activeFieldId: string | null
+  isOverPool: boolean
+  onToggle: (id: string) => void
+  onRename: (field: BoardField) => void
+  onSplit: (id: string) => void
+  cardTags: (field: BoardField, departmentId: string | null) => React.ReactNode
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: POOL_ID })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex max-h-[70vh] min-h-[320px] flex-col rounded-md border bg-muted/30 ${isOver && isOverPool ? "ring-2 ring-primary/40" : ""}`}
+    >
+      <div className="flex items-center justify-between border-b px-3 py-2 text-sm font-medium">
+        <span>GL codes (NR)</span>
+        <span className="text-xs text-muted-foreground">
+          {fields.length} of {total}
+        </span>
+      </div>
+      <div className="flex-1 space-y-2 overflow-y-auto p-2">
+        {isOver && isOverPool && <DropGap label="Remove from department" />}
+        {fields.map((field) => (
+          <PoolCard
+            key={field.id}
+            field={field}
+            selected={selected}
+            dragging={activeFieldId === field.id}
+            onToggle={onToggle}
+            onRename={onRename}
+            onSplit={onSplit}
+            cardTags={cardTags}
+          />
+        ))}
+        {fields.length === 0 && <p className="p-4 text-center text-xs text-muted-foreground">No GL codes match</p>}
+      </div>
+    </div>
+  )
+}
+
+function PoolCard({
+  field,
+  selected,
+  dragging,
+  onToggle,
+  onRename,
+  onSplit,
+  cardTags,
+}: {
+  field: BoardField
+  selected: Set<string>
+  dragging: boolean
+  onToggle: (id: string) => void
+  onRename: (field: BoardField) => void
+  onSplit: (id: string) => void
+  cardTags: (field: BoardField, departmentId: string | null) => React.ReactNode
+}) {
+  const ids = selected.has(field.id) ? [...selected] : [field.id]
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: fieldDragId(field.id, null),
+    data: { fieldId: field.id, origin: null, ids } satisfies DragData,
+  })
+  // Separate id from the draggable so dnd-kit can tell drop-to-combine apart from the drag source.
+  const droppable = useDroppable({ id: `combine:${field.id}` })
+
+  return (
+    <div
+      ref={(node) => {
+        setNodeRef(node)
+        droppable.setNodeRef(node)
+      }}
+      {...listeners}
+      {...attributes}
+      className={`cursor-grab rounded-md border bg-background p-2 text-sm active:cursor-grabbing ${
+        isDragging || dragging ? "opacity-40" : ""
+      } ${droppable.isOver ? "ring-2 ring-primary/50" : ""}`}
+    >
+      <div className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={selected.has(field.id)}
+          onChange={() => onToggle(field.id)}
+          onPointerDown={(event) => event.stopPropagation()}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium leading-snug">
+            {!field.combined && <span className="mr-1 font-mono text-xs">{field.key}</span>}
+            {field.name}
+            {field.combined && <Tag tone="muted">combined</Tag>}
+          </div>
+          {field.combined && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {field.members.map((nr) => (
+                <span key={nr} className="rounded bg-muted px-1 font-mono text-xs">
+                  {nr}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="mt-1 flex flex-wrap gap-1">{cardTags(field, null)}</div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => onRename(field)}
+            onPointerDown={(event) => event.stopPropagation()}
+            title={field.combined ? "Rename or change post code" : "Rename"}
+          >
+            ✎
+          </button>
+          {field.combined && (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              title="Split back into the individual GL codes"
+              onClick={() => onSplit(field.id)}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              split
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DepartmentLane({
+  department,
+  tone,
+  members,
+  gaps,
+  showGap,
+  activeFieldId,
+  onRemove,
+  cardTags,
+}: {
+  department: BoardData["departments"][number]
+  tone: string
+  members: BoardField[]
+  gaps: number
+  showGap: boolean
+  activeFieldId: string | null
+  onRemove: (fieldId: string) => void
+  cardTags: (field: BoardField, departmentId: string | null) => React.ReactNode
+}) {
+  const { setNodeRef } = useDroppable({ id: `dept:${department.id}` })
+  const gapOpen = showGap
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex max-h-[70vh] min-h-[320px] w-56 shrink-0 flex-col rounded-md border border-t-4 bg-background transition-shadow ${tone} ${
+        gapOpen ? "ring-2 ring-primary/40" : ""
+      }`}
+    >
+      <div className="border-b px-3 py-2">
+        <div className="flex items-center justify-between text-sm font-semibold">
+          <span>
+            {department.code} {department.name}
+          </span>
+          <span className="text-xs text-muted-foreground">{members.length}</span>
+        </div>
+        {gaps > 0 && <p className="text-xs text-amber-700">{gaps} without EFI code</p>}
+      </div>
+      <div className="flex-1 space-y-2 overflow-y-auto p-2">
+        {gapOpen && <DropGap label="Drop here" />}
+        {members.map((field) => (
+          <LaneCard
+            key={field.id}
+            field={field}
+            departmentId={department.id}
+            dragging={activeFieldId === field.id}
+            onRemove={onRemove}
+            cardTags={cardTags}
+          />
+        ))}
+        {members.length === 0 && !gapOpen && (
+          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+            Drop GL codes here. Cardholders in this department only see these.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function LaneCard({
+  field,
+  departmentId,
+  dragging,
+  onRemove,
+  cardTags,
+}: {
+  field: BoardField
+  departmentId: string
+  dragging: boolean
+  onRemove: (fieldId: string) => void
+  cardTags: (field: BoardField, departmentId: string | null) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: fieldDragId(field.id, departmentId),
+    data: { fieldId: field.id, origin: departmentId, ids: [field.id] } satisfies DragData,
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`cursor-grab rounded-md border bg-muted/30 p-2 text-sm active:cursor-grabbing ${
+        isDragging || dragging ? "opacity-40" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between gap-1">
+        <span className="font-medium leading-snug">{field.name}</span>
+        <button
+          type="button"
+          className="shrink-0 text-muted-foreground hover:text-red-600"
+          title="Remove from this department"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onRemove(field.id)
+          }}
+        >
+          ×
+        </button>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1">{cardTags(field, departmentId)}</div>
+    </div>
+  )
+}
+
+function DropGap({ label }: { label: string }) {
+  return (
+    <div className="flex h-14 items-center justify-center rounded-md border-2 border-dashed border-primary/50 bg-primary/5 text-xs font-medium text-primary">
+      {label}
     </div>
   )
 }
