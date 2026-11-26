@@ -230,7 +230,7 @@ export default function TransactionEditForm({
                 picker={picker}
                 initialCode={transaction.glFieldKey || formData.categoryCode}
                 initialSplits={transaction.departmentSplits as unknown as DepartmentSplit[] | null}
-                title={fieldMap.categoryCode.name}
+                title="Category"
               />
             </div>
           ) : (

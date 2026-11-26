@@ -99,7 +99,7 @@ export default function TransactionCreateForm({
       <div className="flex flex-row gap-4">
         {picker ? (
           <div className="flex-1">
-            <GlDepartmentPicker picker={picker} initialCode={formData.categoryCode} title="GL code" />
+            <GlDepartmentPicker picker={picker} initialCode={formData.categoryCode} title="Category" />
           </div>
         ) : (
           <FormSelectCategory

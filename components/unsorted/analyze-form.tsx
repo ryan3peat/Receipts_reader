@@ -424,7 +424,7 @@ export default function AnalyzeForm({
                 <GlDepartmentPicker
                   picker={picker}
                   initialCode={formData.categoryCode}
-                  title={fieldMap.categoryCode.name}
+                  title="Category"
                 />
               </div>
             ) : (

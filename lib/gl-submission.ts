@@ -6,7 +6,7 @@ import {
   parseSplits,
   type DepartmentSplit,
 } from "@/lib/gl-resolve"
-import { personDepartments, personGlFields } from "@/models/gl-departments"
+import { listDepartments, listGlFieldRows, personDepartments } from "@/models/gl-departments"
 
 export type GlPatch = {
   categoryCode?: string | null
@@ -35,14 +35,19 @@ export async function glPatchFromForm(form: FormData, mode: "create" | "update")
   }
 
   const companyId = actor.companyUser.id
-  const mine = await personDepartments(companyId, actor.user.id)
+  const [mine, allDepartments, fields] = await Promise.all([
+    personDepartments(companyId, actor.user.id),
+    listDepartments(companyId),
+    listGlFieldRows(companyId),
+  ])
   if (mine.length === 0) {
     return { ok: false, error: "You are not assigned to a department yet. Ask Accounts to add you." }
   }
 
-  const field = (await personGlFields(companyId, actor.user.id)).find((item) => item.key === submitted)
-  if (!field) return { ok: false, error: "Choose a GL code from the list" }
+  const field = fields.find((item) => item.key === submitted)
+  if (!field) return { ok: false, error: "Choose a category from the list" }
 
+  const allowedDepartments = new Set(allDepartments.map((department) => department.code))
   let splits: DepartmentSplit[]
   if (splitsRaw) {
     let parsed: unknown
@@ -51,7 +56,7 @@ export async function glPatchFromForm(form: FormData, mode: "create" | "update")
     } catch {
       return { ok: false, error: "The department split could not be read. Try again." }
     }
-    const checked = normalizeSplits(parseSplits(parsed) ?? [], new Set(mine.map((department) => department.code)))
+    const checked = normalizeSplits(parseSplits(parsed) ?? [], allowedDepartments)
     if (!checked.ok) return checked
     splits = checked.splits
   } else {
@@ -61,7 +66,7 @@ export async function glPatchFromForm(form: FormData, mode: "create" | "update")
 
   const codes = splits.map((split) => split.code)
   if (!fieldAvailableFor(field, codes)) {
-    return { ok: false, error: `${field.name} is not available for every ticked department. Choose another GL code.` }
+    return { ok: false, error: `${field.name} is not available for every selected department. Choose another category.` }
   }
 
   return {
