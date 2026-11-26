@@ -11,6 +11,7 @@ import {
   type StatementPurchase,
 } from "@/lib/sap"
 import { prisma } from "@/lib/db"
+import { efiKey, parseSplits } from "@/lib/gl-resolve"
 
 const KINDS = new Set<LineKind>(["purchase", "payment", "fee", "refund"])
 
@@ -31,6 +32,7 @@ export function toSapReceipt(transaction: {
   description: string | null
   categoryCode: string | null
   projectCode: string | null
+  departmentSplits?: unknown
 }): SapReceipt {
   return {
     id: transaction.id,
@@ -44,6 +46,7 @@ export function toSapReceipt(transaction: {
     description: transaction.description,
     categoryCode: transaction.categoryCode,
     projectCode: transaction.projectCode,
+    departments: parseSplits(transaction.departmentSplits),
   }
 }
 
@@ -75,22 +78,63 @@ export async function receiptsForEmployee(userId: string, employeeId: string) {
   })
 }
 
-export async function sapCatalog(userId: string, employeeCode: string) {
-  const [categories, projects] = await Promise.all([
+/**
+ * Receipts that can be matched to a cardholder's statement: their own, plus receipts entered by Accounts
+ * (or left unassigned) that no other cardholder's statement has claimed yet.
+ */
+export async function matchableReceiptsForEmployee(userId: string, employeeId: string) {
+  const [own, shared] = await Promise.all([
+    receiptsForEmployee(userId, employeeId),
+    prisma.transaction.findMany({
+      where: {
+        userId,
+        AND: [
+          { OR: [{ submittedById: null }, { submittedBy: { role: "accounts" } }] },
+          { statementLines: { none: { statement: { employeeId: { not: employeeId } } } } },
+        ],
+      },
+      orderBy: { issuedAt: "asc" },
+    }),
+  ])
+  const seen = new Set(own.map((receipt) => receipt.id))
+  return [...own, ...shared.filter((row) => !seen.has(row.id)).map(toSapReceipt)]
+}
+
+export async function sapCatalog(userId: string, employee: { id: string; employeeCode: string | null }) {
+  const [categories, projects, efiCodes, memberships] = await Promise.all([
     prisma.category.findMany({ where: { userId }, select: { code: true, name: true } }),
     prisma.project.findMany({ where: { userId }, select: { code: true, name: true } }),
+    prisma.efiCode.findMany({
+      where: { userId },
+      select: { code: true, name: true, nrCode: true, department: { select: { code: true } } },
+    }),
+    prisma.userDepartment.findMany({
+      where: { userId: employee.id },
+      select: { isDefault: true, department: { select: { code: true } } },
+    }),
   ])
+  const home = memberships.find((membership) => membership.isDefault) ?? memberships[0]
   return {
     categories: new Map(categories.map((category) => [category.code, category.name])),
     projects: new Map(projects.map((project) => [project.code, project.name])),
-    dimension: employeeCode,
+    dimension: employee.employeeCode || "",
+    // Without any EFI codes set up, rows keep their NR codes so exports made before departments still work.
+    efi:
+      efiCodes.length === 0
+        ? undefined
+        : new Map(
+            efiCodes
+              .filter((efi) => efi.nrCode)
+              .map((efi) => [efiKey(efi.nrCode as string, efi.department.code), { code: efi.code, name: efi.name }])
+          ),
+    defaultDepartment: home?.department.code ?? null,
   }
 }
 
 export async function rowsForEmployeeReceipts(userId: string, employeeId: string, employeeCode: string): Promise<SapRow[]> {
   const [receipts, catalog] = await Promise.all([
     receiptsForEmployee(userId, employeeId),
-    sapCatalog(userId, employeeCode),
+    sapCatalog(userId, { id: employeeId, employeeCode }),
   ])
   return sapRowsForReceipts(receipts, catalog)
 }
@@ -160,7 +204,7 @@ export async function rematchStatement(statementId: string, userId: string) {
     include: { lines: true },
   })
   if (!statement) return null
-  const receipts = await receiptsForEmployee(userId, statement.employeeId)
+  const receipts = await matchableReceiptsForEmployee(userId, statement.employeeId)
   const purchases = purchasesFromLines(statement.lines)
   const matches = matchStatementLines(purchases, receipts)
   const current = new Map(statement.lines.map((line) => [line.id, line.transactionId]))
@@ -198,12 +242,25 @@ export async function rematchStatementsForEmployee(userId: string, employeeId: s
   return statements.length
 }
 
+/** Rematch every statement, for receipts entered by Accounts that could belong to any cardholder. */
+export async function rematchAllStatements(userId: string) {
+  const statements = await prisma.cardStatement.findMany({
+    where: { userId },
+    select: { id: true },
+    orderBy: { createdAt: "desc" },
+  })
+  for (const statement of statements) {
+    await rematchStatement(statement.id, userId)
+  }
+  return statements.length
+}
+
 export async function rowsForStatement(statementId: string, userId: string) {
   const statement = await rematchStatement(statementId, userId)
   if (!statement) return null
-  const receipts = await receiptsForEmployee(userId, statement.employeeId)
+  const receipts = await matchableReceiptsForEmployee(userId, statement.employeeId)
   const byId = new Map(receipts.map((receipt) => [receipt.id, receipt]))
-  const catalog = await sapCatalog(userId, statement.employee.employeeCode || "")
+  const catalog = await sapCatalog(userId, { id: statement.employeeId, employeeCode: statement.employee.employeeCode })
   const rows = statement.lines.flatMap((line) => {
     const purchase = purchasesFromLines([line])[0]
     if (purchase.kind !== "purchase") return []

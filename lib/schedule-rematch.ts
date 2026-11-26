@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db"
-import { rematchStatementsForEmployee } from "@/models/statements"
+import { rematchAllStatements, rematchStatementsForEmployee } from "@/models/statements"
 import { after } from "next/server"
 
 async function employeeIdsFromFiles(userId: string, fileIds: string[]) {
@@ -28,6 +28,8 @@ export function scheduleRematchForTransaction(
       for (const employeeId of ids) {
         await rematchStatementsForEmployee(userId, employeeId)
       }
+      // Receipts entered by Accounts can belong to any cardholder, so every statement gets a look.
+      await rematchAllStatements(userId)
     } catch (error) {
       console.error("Background statement rematch failed", { userId, error })
     }

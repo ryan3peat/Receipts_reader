@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import type { DepartmentSplit } from "@/lib/gl-resolve"
 import { COMPUTED_FIELD_CODES } from "@/models/defaults-data"
 import { isTransactionStatus, type ManualTransactionStatus } from "@/lib/transaction-status"
 import { scopeTransactionWhere } from "@/lib/visibility"
@@ -21,10 +22,37 @@ export type TransactionData = {
   files?: string[] | undefined
   extra?: Record<string, unknown>
   categoryCode?: string | null
+  /** The GL choice the cardholder made (a GlField key). Null or undefined when it was not set. */
+  glFieldKey?: string | null
+  /** Departments the receipt is charged to. Null clears them. Undefined leaves them unchanged. */
+  departmentSplits?: DepartmentSplit[] | null
   projectCode?: string | null
   issuedAt?: Date | string | null
   text?: string | null
   [key: string]: unknown
+}
+
+// glFieldKey and departmentSplits are written only through glColumns, never through the field spread.
+function withoutGlColumns(standard: TransactionData) {
+  const { glFieldKey: _glFieldKey, departmentSplits: _departmentSplits, ...plain } = standard
+  return plain
+}
+
+// Only the columns the caller actually sent are written, so saving one form never clears another person's data.
+function glColumns(data: TransactionData): {
+  glFieldKey?: string | null
+  departmentSplits?: Prisma.InputJsonValue | typeof Prisma.DbNull
+} {
+  const columns: {
+    glFieldKey?: string | null
+    departmentSplits?: Prisma.InputJsonValue | typeof Prisma.DbNull
+  } = {}
+  if (data.glFieldKey !== undefined) columns.glFieldKey = data.glFieldKey
+  if (data.departmentSplits !== undefined) {
+    columns.departmentSplits =
+      data.departmentSplits === null ? Prisma.DbNull : (data.departmentSplits as unknown as Prisma.InputJsonValue)
+  }
+  return columns
 }
 
 export type TransactionFilters = {
@@ -203,14 +231,16 @@ export const createTransaction = async (
   const actor = await getActor()
   // Prefer the uploader when Accounts reviews someone else's receipt; otherwise the person saving it.
   const submittedById = options?.submittedById || actor.user.id
+  const plain = withoutGlColumns(standard)
 
   const newTransaction = await prisma.transaction.create({
     data: {
-      ...standard,
+      ...plain,
       extra: extra,
       items: data.items as Prisma.InputJsonValue,
       userId,
       submittedById,
+      ...glColumns(data),
     },
   })
 
@@ -228,9 +258,10 @@ export const updateTransaction = async (id: string, userId: string, data: Transa
   return await prisma.transaction.update({
     where: { id },
     data: {
-      ...standard,
+      ...withoutGlColumns(standard),
       extra: extra,
       items: data.items ? (data.items as Prisma.InputJsonValue) : [],
+      ...glColumns(data),
     },
   })
 }

@@ -9,6 +9,7 @@ vi.mock("@/lib/config", () => ({ default: { auth: mocks.auth } }))
 vi.mock("@/lib/db", () => ({ prisma: { user: mocks.user } }))
 vi.mock("@/lib/access", () => ({ getActor: vi.fn(), requireMasterAdmin: vi.fn() }))
 vi.mock("@/models/users", () => ({ getUserByEmail: vi.fn(), getUserById: vi.fn() }))
+vi.mock("@/models/gl-departments", () => ({ setPersonDepartments: vi.fn() }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 
 import { addMemberAction, updateMemberRoleAction } from "@/app/(app)/settings/users/actions"

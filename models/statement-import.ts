@@ -1,6 +1,6 @@
 import { matchStatementLines, type Cardholder, type CombinedStatement, type HolderCheck, type ParsedCardSection, type StatementPurchase } from "@/lib/sap"
 import { planSave } from "@/lib/statement-state"
-import { receiptsForEmployee, saveCardStatement } from "@/models/statements"
+import { matchableReceiptsForEmployee, saveCardStatement } from "@/models/statements"
 
 export type ImportedHolder = {
   employeeId: string
@@ -30,7 +30,7 @@ export async function saveCardSection(input: {
   person: Cardholder
 }): Promise<ImportedHolder> {
   const { section, person } = input
-  const receipts = await receiptsForEmployee(input.ownerId, person.id)
+  const receipts = await matchableReceiptsForEmployee(input.ownerId, person.id)
   const purchases: StatementPurchase[] = section.lines.map((line, index) => ({
     id: String(index),
     postedOn: line.postedOn,

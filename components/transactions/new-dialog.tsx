@@ -9,18 +9,21 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Category, Currency, Project } from "@/prisma/client"
+import type { GlOption, GlPicker } from "@/lib/gl-options"
+import { Currency, Project } from "@/prisma/client"
 import TransactionCreateForm from "./create"
 
 export function NewTransactionDialogClient({
   children,
   categories,
+  picker,
   currencies,
   settings,
   projects,
 }: {
   children: React.ReactNode
-  categories: Category[]
+  categories: GlOption[]
+  picker: GlPicker | null
   currencies: Currency[]
   settings: Record<string, string>
   projects: Project[]
@@ -38,6 +41,7 @@ export function NewTransactionDialogClient({
 
         <TransactionCreateForm
           categories={categories}
+          picker={picker}
           currencies={currencies}
           settings={settings}
           projects={projects}

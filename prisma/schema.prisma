@@ -46,6 +46,10 @@ model User {
   progress            Progress[]
   ownedStatements     CardStatement[] @relation("StatementOwner")
   cardStatements      CardStatement[] @relation("StatementEmployee")
+  departments           Department[]
+  departmentMemberships UserDepartment[]
+  efiCodes              EfiCode[]
+  glFields              GlField[]
 
   @@map("users")
 }
@@ -214,6 +218,8 @@ model Transaction {
   updatedAt             DateTime  @updatedAt @map("updated_at")
   text                  String?
   statementLines        CardStatementLine[]
+  glFieldKey            String?   @map("gl_field_key")
+  departmentSplits      Json?     @map("department_splits")
 
   @@index([userId])
   @@index([submittedById])
@@ -298,4 +304,84 @@ model Progress {
 
   @@index([userId])
   @@map("progress")
+}
+
+model Department {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  people    UserDepartment[]
+  efiCodes  EfiCode[]
+  glFields  GlFieldDepartment[]
+
+  @@unique([userId, code])
+  @@map("departments")
+}
+
+model UserDepartment {
+  userId       String     @map("user_id") @db.Uuid
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  departmentId String     @map("department_id") @db.Uuid
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  isDefault    Boolean    @default(false) @map("is_default")
+
+  @@id([userId, departmentId])
+  @@map("user_departments")
+}
+
+// The specific account SAP posts to, e.g. 2210-03. nrCode links it to the GL code cardholders choose.
+model EfiCode {
+  id           String     @id @default(uuid()) @db.Uuid
+  userId       String     @map("user_id") @db.Uuid
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code         String
+  name         String
+  departmentId String     @map("department_id") @db.Uuid
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  nrCode       String?    @map("nr_code")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@unique([userId, code])
+  @@unique([userId, nrCode, departmentId])
+  @@map("efi_codes")
+}
+
+// A GL choice shown to cardholders. Single fields use the NR code as key. Combined fields have their own key.
+model GlField {
+  id          String              @id @default(uuid()) @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key         String
+  name        String
+  combined    Boolean             @default(false)
+  postCode    String?             @map("post_code")
+  sortOrder   Int                 @default(0) @map("sort_order")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  members     GlFieldMember[]
+  departments GlFieldDepartment[]
+
+  @@unique([userId, key])
+  @@map("gl_fields")
+}
+
+model GlFieldMember {
+  fieldId String  @map("field_id") @db.Uuid
+  field   GlField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  nrCode  String  @map("nr_code")
+
+  @@id([fieldId, nrCode])
+  @@map("gl_field_members")
+}
+
+model GlFieldDepartment {
+  fieldId      String     @map("field_id") @db.Uuid
+  field        GlField    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  departmentId String     @map("department_id") @db.Uuid
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([fieldId, departmentId])
+  @@map("gl_field_departments")
 }

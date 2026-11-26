@@ -15,7 +15,7 @@ export const FormSelectCategory = ({
   ...props
 }: {
   title: string
-  categories: Category[]
+  categories: Pick<Category, "code" | "name" | "color">[]
   emptyValue?: string
   placeholder?: string
   hideIfEmpty?: boolean

@@ -5,6 +5,7 @@ import { requireAccounts } from "@/lib/access"
 import { ActionState } from "@/lib/actions"
 import { getCurrentUser, isSubscriptionExpired } from "@/lib/auth"
 import { missingRequiredFormFieldNames } from "@/lib/field-validation"
+import { glPatchFromForm } from "@/lib/gl-submission"
 import { scheduleRematchForTransaction } from "@/lib/schedule-rematch"
 import { isManualTransactionStatus } from "@/lib/transaction-status"
 import {
@@ -28,6 +29,7 @@ import {
   findDuplicateTransaction,
 } from "@/models/transactions"
 import { updateUser } from "@/models/users"
+import type { TransactionData } from "@/models/transactions"
 import { Transaction } from "@/prisma/client"
 import { randomUUID } from "crypto"
 import { revalidatePath } from "next/cache"
@@ -49,8 +51,11 @@ export async function createTransactionAction(
       return { success: false, error: `Required fields missing: ${missing.join(", ")}` }
     }
 
+    const gl = await glPatchFromForm(formData, "create")
+    if (!gl.ok) return { success: false, error: gl.error }
+
     const forceSave = formData.get("forceSave") === "true"
-    const transactionData = validatedForm.data
+    const transactionData = { ...validatedForm.data, ...gl.patch } as TransactionData
 
     // --- Perform the deduplication check FIRST ---
     if (!forceSave) {
@@ -103,7 +108,13 @@ export async function saveTransactionAction(
       return { success: false, error: `Required fields missing: ${missing.join(", ")}` }
     }
 
-    const transaction = await updateTransaction(transactionId, user.id, validatedForm.data)
+    const gl = await glPatchFromForm(formData, "update")
+    if (!gl.ok) return { success: false, error: gl.error }
+
+    const transaction = await updateTransaction(transactionId, user.id, {
+      ...validatedForm.data,
+      ...gl.patch,
+    } as TransactionData)
 
     scheduleRematchForTransaction(user.id, {
       submittedById: transaction.submittedById,

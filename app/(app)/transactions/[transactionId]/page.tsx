@@ -2,9 +2,10 @@ import { FormTextarea } from "@/components/forms/simple"
 import TransactionEditForm from "@/components/transactions/edit"
 import TransactionFiles from "@/components/transactions/transaction-files"
 import { Card } from "@/components/ui/card"
+import { getActor } from "@/lib/access"
 import { getCurrentUser } from "@/lib/auth"
+import { glFormChoices } from "@/lib/gl-options"
 import { incompleteTransactionFields } from "@/lib/stats"
-import { getCategories } from "@/models/categories"
 import { getCurrencies } from "@/models/currencies"
 import { getFields } from "@/models/fields"
 import { getFilesByTransactionId } from "@/models/files"
@@ -23,7 +24,8 @@ export default async function TransactionPage({ params }: { params: Promise<{ tr
   }
 
   const files = await getFilesByTransactionId(transactionId, user.id)
-  const categories = await getCategories(user.id)
+  const actor = await getActor()
+  const { options, picker } = await glFormChoices(actor)
   const currencies = await getCurrencies(user.id)
   const settings = await getSettings(user.id)
   const fields = await getFields(user.id)
@@ -50,7 +52,8 @@ export default async function TransactionPage({ params }: { params: Promise<{ tr
         <div className="w-full p-5">
           <TransactionEditForm
             transaction={transaction}
-            categories={categories}
+            categories={options}
+            picker={picker}
             currencies={currencies}
             settings={settings}
             fields={fields}
