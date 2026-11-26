@@ -61,12 +61,9 @@ export async function renameFieldAction(fieldId: string, name: string, postCode:
   const clean = cleanName(name)
   if (!clean) return { success: false as const, error: "Enter a name" }
   return run(async (companyId) => {
-    await renameField(companyId, fieldId, clean)
-    await setCombinedPostCode(companyId, fieldId, postCode || null).catch((error: unknown) => {
-      // Single fields have no post code. Renaming them alone is fine.
-      if (error instanceof Error && error.message === "Only combined fields have a post code") return
-      throw error
-    })
+    const renamed = await renameField(companyId, fieldId, clean)
+    // Combined fields can clear the post code by saving null. Single NR codes have no post code.
+    if (renamed.combined) await setCombinedPostCode(companyId, fieldId, postCode)
   })
 }
 

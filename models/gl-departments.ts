@@ -164,8 +164,23 @@ export async function setFieldDepartments(companyId: string, fieldIds: string[],
 }
 
 export async function renameField(companyId: string, fieldId: string, name: string) {
-  const result = await prisma.glField.updateMany({ where: { id: fieldId, userId: companyId }, data: { name } })
-  if (result.count === 0) throw new Error("Not found")
+  const field = await prisma.glField.findFirst({
+    where: { id: fieldId, userId: companyId },
+    include: { members: { select: { nrCode: true } } },
+  })
+  if (!field) throw new Error("Not found")
+
+  await prisma.$transaction(async (tx) => {
+    await tx.glField.update({ where: { id: fieldId }, data: { name } })
+    // Single NR fields share their name with the category cardholders pick in forms.
+    if (!field.combined && field.members.length === 1) {
+      await tx.category.updateMany({
+        where: { userId: companyId, code: field.members[0].nrCode },
+        data: { name },
+      })
+    }
+  })
+  return { combined: field.combined }
 }
 
 export async function setCombinedPostCode(companyId: string, fieldId: string, postCode: string | null) {

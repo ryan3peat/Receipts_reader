@@ -159,6 +159,41 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
       })
   }
 
+  function patchRename(fieldId: string, name: string, postCode: string | null) {
+    setMessage(null)
+    let snapshot: BoardField[] | null = null
+    setFields((current) => {
+      snapshot = current
+      return current.map((field) => {
+        if (field.id !== fieldId) return field
+        return {
+          ...field,
+          name,
+          postCode: field.combined ? postCode : field.postCode,
+        }
+      })
+    })
+    pendingSaves.current += 1
+    setSavingCount((count) => count + 1)
+    void renameFieldAction(fieldId, name, postCode)
+      .then((result) => {
+        pendingSaves.current = Math.max(0, pendingSaves.current - 1)
+        setSavingCount((count) => Math.max(0, count - 1))
+        if (!result.success) {
+          if (snapshot) setFields(snapshot)
+          setMessage({ kind: "error", text: result.error ?? "Could not rename that GL code." })
+          return
+        }
+        if (pendingSaves.current === 0) router.refresh()
+      })
+      .catch(() => {
+        pendingSaves.current = Math.max(0, pendingSaves.current - 1)
+        setSavingCount((count) => Math.max(0, count - 1))
+        if (snapshot) setFields(snapshot)
+        setMessage({ kind: "error", text: "Could not rename that GL code." })
+      })
+  }
+
   if (!hasDepartments) {
     return (
       <div className="space-y-4 rounded-md border p-6">
@@ -419,7 +454,7 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
           onSave={(name, postCode) => {
             const id = dialog.field.id
             setDialog(null)
-            run(() => renameFieldAction(id, name, postCode))
+            patchRename(id, name, postCode)
           }}
         />
       )}
@@ -828,6 +863,7 @@ function RenameDialog({
           Cancel
         </Button>
         <Button
+          type="button"
           onClick={() => {
             if (!name.trim()) return setError("Enter a name")
             onSave(name.trim(), field.combined ? post || null : null)
