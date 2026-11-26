@@ -56,6 +56,7 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
   const [fields, setFields] = useState(data.fields)
   const dragRef = useRef<Drag | null>(null)
   const pendingSaves = useRef(0)
+  const [savingCount, setSavingCount] = useState(0)
 
   useEffect(() => {
     if (pendingSaves.current === 0) setFields(data.fields)
@@ -69,9 +70,11 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
     return map
   }, [data.efi])
 
-  function beginDrag(next: Drag) {
+  function beginDrag(event: React.DragEvent, next: Drag) {
     // Ref is set synchronously so dragOver/drop see it before React re-renders.
     dragRef.current = next
+    event.dataTransfer.setData("text/plain", next.ids.join(","))
+    event.dataTransfer.effectAllowed = "move"
   }
 
   function endDrag() {
@@ -88,33 +91,42 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
     })
   }
 
-  /** Instant UI update, then save in the background. On failure, refresh from the server. */
+  /** Instant UI update, then save in the background. On failure, roll the local board back. */
   function patchDepartments(fieldIds: string[], addIds: string[], removeIds: string[]) {
     if (fieldIds.length === 0) return
     setMessage(null)
-    setFields((current) =>
-      current.map((field) => {
+    let snapshot: BoardField[] | null = null
+    setFields((current) => {
+      snapshot = current
+      return current.map((field) => {
         if (!fieldIds.includes(field.id)) return field
-        let next = field.departmentIds.filter((id) => !removeIds.includes(id))
-        for (const id of addIds) if (!next.includes(id)) next = [...next, id]
-        return next === field.departmentIds ? field : { ...field, departmentIds: next }
+        const without = field.departmentIds.filter((id) => !removeIds.includes(id))
+        const next = without.concat(addIds.filter((id) => !without.includes(id)))
+        if (next.length === field.departmentIds.length && next.every((id, index) => id === field.departmentIds[index])) {
+          return field
+        }
+        return { ...field, departmentIds: next }
       })
-    )
+    })
     pendingSaves.current += 1
+    setSavingCount((count) => count + 1)
     void setFieldDepartmentsAction(fieldIds, addIds, removeIds)
       .then((result) => {
         pendingSaves.current = Math.max(0, pendingSaves.current - 1)
+        setSavingCount((count) => Math.max(0, count - 1))
         if (!result.success) {
-          setMessage({ kind: "error", text: result.error ?? "Could not save. Reloading." })
-          router.refresh()
+          if (snapshot) setFields(snapshot)
+          setMessage({ kind: "error", text: result.error ?? "Could not save that change." })
           return
         }
+        // Soft refresh so other tabs and the EFI gaps stay in sync, without blocking the board.
         if (pendingSaves.current === 0) router.refresh()
       })
       .catch(() => {
         pendingSaves.current = Math.max(0, pendingSaves.current - 1)
-        setMessage({ kind: "error", text: "Could not save. Reloading." })
-        router.refresh()
+        setSavingCount((count) => Math.max(0, count - 1))
+        if (snapshot) setFields(snapshot)
+        setMessage({ kind: "error", text: "Could not save that change." })
       })
   }
 
@@ -236,6 +248,9 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
       {message && (
         <p className={`text-sm ${message.kind === "error" ? "text-red-600" : "text-green-700"}`}>{message.text}</p>
       )}
+      {savingCount > 0 && !message && (
+        <p className="text-xs text-muted-foreground">Saving…</p>
+      )}
 
       {tab === "board" && (
         <>
@@ -294,8 +309,8 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
                   <div
                     key={field.id}
                     draggable
-                    onDragStart={() =>
-                      beginDrag({ ids: selected.has(field.id) ? [...selected] : [field.id], origin: null })
+                    onDragStart={(event) =>
+                      beginDrag(event, { ids: selected.has(field.id) ? [...selected] : [field.id], origin: null })
                     }
                     onDragEnd={() => endDrag()}
                     onDragOver={(event) => {
@@ -389,7 +404,13 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
                         <div
                           key={field.id}
                           draggable
-                          onDragStart={() => beginDrag({ ids: [field.id], origin: department.id })}
+                          onDragStart={(event) => {
+                            if ((event.target as HTMLElement).closest("button")) {
+                              event.preventDefault()
+                              return
+                            }
+                            beginDrag(event, { ids: [field.id], origin: department.id })
+                          }}
                           onDragEnd={() => endDrag()}
                           className="rounded-md border bg-muted/30 p-2 text-sm"
                         >
@@ -397,8 +418,9 @@ export function GlCodesBoard({ data, hasDepartments }: { data: BoardData; hasDep
                             <span className="font-medium leading-snug">{field.name}</span>
                             <button
                               type="button"
-                              className="text-muted-foreground hover:text-red-600"
+                              className="shrink-0 text-muted-foreground hover:text-red-600"
                               title="Remove from this department"
+                              onMouseDown={(event) => event.stopPropagation()}
                               onClick={(event) => {
                                 event.preventDefault()
                                 event.stopPropagation()
